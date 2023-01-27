@@ -1,0 +1,1 @@
+This used the skeleton of Jötunn Mod Example, so every asset.png or whatever I kept anyway because I am afraid the build will fail otherwise.
