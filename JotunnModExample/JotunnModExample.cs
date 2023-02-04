@@ -62,7 +62,11 @@ namespace JotunnModExample
                             ZLog.LogError("Prefab missing ZNetView: " + prefab.name);
                     }
 
-
+                    var staticSolidRayMask = LayerMask.GetMask(new string[]
+                    {
+                                "static_solid",
+                                "terrain"
+                    });
 
                     // Dump prefabs
                     ZPackage pkg = new ZPackage();
@@ -73,6 +77,9 @@ namespace JotunnModExample
                     foreach (var prefab in prefabs)
                     {
                         var view = prefab.GetComponent<ZNetView>();
+
+                        if ((prefab.layer & staticSolidRayMask) > 0)
+                            ZLog.Log("staticSolid: " + prefab.name);
 
                         pkg.Write(view.GetPrefabName());
                         pkg.Write(view.m_distant);
@@ -169,20 +176,40 @@ namespace JotunnModExample
                         pkg.Write(loc.m_snapToWater);
                         pkg.Write(loc.m_unique);
 
-                        List<ZNetView> views = new List<ZNetView>();
+                        // set all active like in laceLocations()
                         foreach (var view in loc.m_netViews)
                         {
+                            view.gameObject.SetActive(true);
+                        }
+
+                        List<ZNetView> views = new List<ZNetView>();
+                        ZNetView.StartGhostInit();
+                        foreach (var view in loc.m_netViews) // .m_prefab.GetComponent<Location>()
+                        {
                             if (view.gameObject.activeSelf)
-                                views.Add(view);
+                            {
+                                var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
+                                    view.gameObject.transform.position, view.gameObject.transform.rotation);
+
+                                views.Add(obj.GetComponent<ZNetView>());
+                            }
                         }
 
                         pkg.Write(views.Count);
                         foreach (var view in views)
                         {
                             pkg.Write(view.GetPrefabName().GetStableHashCode());
-                            pkg.Write(view.gameObject.transform.position);
-                            pkg.Write(view.gameObject.transform.rotation);
+                            //pkg.Write(view.gameObject.transform.position);
+                            //pkg.Write(view.gameObject.transform.rotation);
+                            pkg.Write(view.m_zdo.m_position);
+                            pkg.Write(view.m_zdo.m_rotation);
                         }
+
+                        // free (not really needed)
+                        foreach (var view in views)
+                            UnityEngine.GameObject.Destroy(view.gameObject);
+
+                        ZNetView.FinishGhostInit();
                     }
 
                     File.WriteAllBytes("./dumped/zoneLocations.pkg", pkg.GetArray());
@@ -195,6 +222,8 @@ namespace JotunnModExample
                 {
                     ZLog.Log("Dumping Vegetation");
 
+
+
                     ZPackage pkg = new ZPackage();
 
                     List<ZoneSystem.ZoneVegetation> vegetation = new List<ZoneSystem.ZoneVegetation>();
@@ -203,18 +232,81 @@ namespace JotunnModExample
                         if (veg.m_enable)
                         {
                             if (veg.m_prefab && veg.m_prefab.GetComponent<ZNetView>())
+                            {
                                 vegetation.Add(veg);
+                                ZLog.Log("Querying " + veg.m_prefab.name);
+                            }
                             else
-                                ZLog.LogError("Failed to serialize ZoneVegetation: " + veg.m_name);
+                                ZLog.LogError("Failed to query ZoneVegetation: " + veg.m_prefab.name);
                         }
                         else
                         {
-                            ZLog.Log("Skipping dump of " + veg.m_name);
+                            ZLog.Log("Skipping query of " + veg.m_prefab.name);
 
-                            if (veg.m_name != veg.m_prefab.name)
-                                ZLog.LogWarning("ZoneVegetation unequal names: " + veg.m_name + ", " + veg.m_prefab.name);
+                            // Most conflict anyways because lazy
+                            //if (veg.m_name != veg.m_prefab.name)
+                                //ZLog.LogWarning("ZoneVegetation unequal names: " + veg.m_name + ", " + veg.m_prefab.name);
                         }
                     }
+
+                    var layers = Enumerable.Range(0, 31).Select(index => index + ": " + LayerMask.LayerToName(index)).Where(l => !string.IsNullOrEmpty(l)).ToList();
+
+                    int BLOCK_MASK = __instance.m_blockRayMask;
+                    int SOLID_MASK = __instance.m_solidRayMask;
+                    int STATIC_MASK = __instance.m_staticSolidRayMask;
+                    int TERRAIN_MASK = __instance.m_terrainRayMask;
+
+                    ZLog.Log("Layers: \n - " + string.Join("\n - ", layers));
+
+                    ZLog.Log("blockRayMask: " + Convert.ToString(BLOCK_MASK, 2));
+                    ZLog.Log("solidRayMask: " + Convert.ToString(SOLID_MASK, 2));
+                    ZLog.Log("staticSolidRayMask: " + Convert.ToString(STATIC_MASK, 2));
+                    ZLog.Log("terrainRayMask: " + Convert.ToString(TERRAIN_MASK, 2));
+
+
+                    HashSet<string> tinyRadius = new HashSet<string>(
+                        new string[] {"CloudberryBush", 
+                            "Beech_small1", "Beech_small2", "Bush01", "Pickable_Thistle",
+                            "BlueberryBush", "RaspberryBush", "Pickable_Mushroom",
+                            "Pickable_Dandelion", "Pickable_Flint", "Pickable_Stone",
+                            "Pickable_SeedTurnip", "Pickable_SeedCarrot",
+                            "Pickable_Mushroom_Magecap", "Pickable_Mushroom_JotunPuffs",
+                            "YggaShoot_small1",
+                        }
+                    );
+
+                    // ~.45
+                    HashSet<string> smallRadius = new HashSet<string>(
+                        new string[] {"Beech1", "Birch1", "Birch1_aut", "Birch2", "Oak1", "Birch2_aut",
+                            "FirTree", "Pinetree_01", "Bush02_en", "FirTree_small_dead",
+                            "SwampTree",
+                            "FirTree_small", "Bush01_heath", "Pickable_Branch",
+                            "FirTree", "MineRock_Obsidian"
+                        }
+                    );
+
+                    Dictionary<string, float> customRadius = new Dictionary<string, float>();
+                    customRadius.Add("SwampTree2", 1);
+                    customRadius.Add("SwampTree2_log", 12); // very rectangular
+                    customRadius.Add("FirTree_oldLog", 2);
+                    customRadius.Add("stubbe", 2);
+                    customRadius.Add("StatueEvil", 1.2f);
+                    customRadius.Add("shrub_2_heath", .7f);
+                    customRadius.Add("shrub_2", .7f);
+                    customRadius.Add("Leviathan", 40); // redundant since ocean empty
+                    customRadius.Add("YggaShoot1", 3);
+                    customRadius.Add("YggaShoot2", 4);
+                    customRadius.Add("YggaShoot3", 3);
+                    customRadius.Add("cliff_mistlands1", 12);
+                    customRadius.Add("cliff_mistlands2", 9);
+                    customRadius.Add("giant_helmet1", 6);
+                    customRadius.Add("giant_helmet2", 4);
+                    customRadius.Add("giant_sword1", 2);
+                    customRadius.Add("giant_sword2", 1);
+                    customRadius.Add("giant_ribs", 6);
+                    customRadius.Add("YggdrasilRoot", 6);
+
+
 
                     pkg.Write(date);
                     pkg.Write(Version.GetVersionString());
@@ -230,6 +322,111 @@ namespace JotunnModExample
                         //pkg.Write(veg.m_name);
                         pkg.Write((int)veg.m_biome);
                         pkg.Write((int)veg.m_biomeArea);
+
+                        GameObject obj = Instantiate<GameObject>(veg.m_prefab);
+
+                        var collider = obj.GetComponent<Collider>();
+                        if (!collider) collider = obj.GetComponentInChildren<Collider>();
+                        if (collider)
+                        {
+                            // test whether layer has
+                            //  "Default",
+                            //  "static_solid",
+                            //  "Default_small",
+                            //  "piece"
+                            var extents3 = collider.bounds.extents;
+                            var extents2 = new Vector2(extents3.x, extents3.z);
+
+                            float radius = extents2.magnitude; // = extents2.magnitude;
+
+                            if ((collider.gameObject.layer & BLOCK_MASK) == 0)
+                                radius = 0;
+
+                            float temp = 0;
+                            if (customRadius.TryGetValue(veg.m_prefab.name, out temp))
+                                radius = temp;
+                            else if (tinyRadius.Contains(veg.m_prefab.name))
+                                radius = .18f;
+                            else if (smallRadius.Contains(veg.m_prefab.name))
+                                radius = .45f;
+
+                            ZLog.Log("Dumping vegetation block layer " + veg.m_prefab.name + ", radius: " + radius);
+                            pkg.Write(radius);
+
+                            /*
+                            if ((collider.gameObject.layer & BLOCK_MASK) > 0)
+                            {
+
+                                //radiusMap["mudpile_beacon"] = 0;
+                                //radiusMap["MineRock_Tin"]
+
+                                // "ice1" is part of deep north (NYI)
+
+                                // .2 or less
+
+
+                                pkg.Write((float)extents2.magnitude); // hopefully most vegetation is circular
+                                ZLog.Log("Dumping vegetation block layer " + veg.m_prefab.name + ", radius: " + extents2.magnitude);
+                            }
+                            else
+                            {
+                                ZLog.LogWarning("Vegetation has no block mask " + veg.m_prefab.name + "(" + Convert.ToString(collider.gameObject.layer, 2) + "), radius: " + extents2.magnitude);
+                                //var extents3 = collider.bounds.extents;
+                                //var extents2 = new Vector2(extents3.x, extents3.z);
+                                //pkg.Write((float)extents2.magnitude); // hopefully most vegetation is circular
+                                pkg.Write(0.0f);
+                            }*/
+                        } else
+                        {
+                            ZLog.LogWarning("Vegetation has no collider " + veg.m_prefab.name);
+                            pkg.Write(0.0f);
+                        }
+
+                        Destroy(obj);
+                        
+                        /*else
+                        {
+                            ZLog.LogWarning("Vegetation missing collider: " + veg.m_prefab.name);
+
+                            var filter = veg.m_prefab.GetComponent<MeshFilter>();
+                            if (!filter) filter = veg.m_prefab.GetComponentInChildren<MeshFilter>();
+                            if (filter)
+                            {
+                                var mesh = filter.mesh;
+                                var extents3 = mesh.bounds.extents;
+                                var extents2 = new Vector2(extents3.x, extents3.z);
+                                pkg.Write((float)extents2.magnitude); // hopefully most vegetation is circular
+                            } else
+                            {
+                                ZLog.LogWarning("Vegetation missing meshfilter");
+                                var renderer = veg.m_prefab.GetComponent<Renderer>();
+                                if (!renderer) renderer = veg.m_prefab.GetComponentInChildren<Renderer>();
+                                if (renderer)
+                                {
+                                    var extents3 = renderer.bounds.extents;
+                                    var extents2 = new Vector2(extents3.x, extents3.z);
+                                    pkg.Write((float)extents2.magnitude); // hopefully most vegetation is circular
+                                } else
+                                {
+                                    ZLog.LogError("Vegetation missing renderer: " + veg.m_prefab.name);
+                                    pkg.Write(0.15f);
+
+                                    //ZLog.LogWarning("Vegetation missing renderer: " + veg.m_prefab.name);
+
+                                    //var lod = veg.m_prefab.GetComponent<LODGroup>();
+                                    //if (lod)
+                                    //{
+                                    //    
+                                    //}
+                                    //else
+                                    //{
+                                    //    ZLog.LogError("Vegetation complete fail: ")
+                                    //    pkg.Write(0.15f);
+                                    //}
+
+                                }
+                            }                            
+                        }*/
                         pkg.Write(veg.m_min);
                         pkg.Write(veg.m_max);
                         pkg.Write(veg.m_minTilt);
@@ -258,6 +455,11 @@ namespace JotunnModExample
                         pkg.Write(veg.m_chanceToUseGroundTilt);
                         pkg.Write(veg.m_minVegetation);
                         pkg.Write(veg.m_maxVegetation);
+                        
+                        // offset by final transforms:
+                        //var obj = UnityEngine.GameObject.Instantiate<GameObject>(veg.m_prefab)
+                        
+                        //pkg.Write(v)
                     }
 
                     File.WriteAllBytes("./dumped/vegetation.pkg", pkg.GetArray());
