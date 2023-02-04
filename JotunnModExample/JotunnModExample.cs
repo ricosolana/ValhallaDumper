@@ -11,6 +11,7 @@ using HarmonyLib;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -36,15 +37,183 @@ namespace JotunnModExample
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), harmonyInstanceId: PluginGUID);
 
             ZLog.Log("Loading ValhallaDumper");
+
+            //Directory.CreateDirectory("./locationTraces");
+
+
         }
 
         [HarmonyPatch(typeof(ZoneSystem))]
         class ZoneSystemPatch
         {
+            //[HarmonyPrefix]
+            //[HarmonyPatch(nameof(ZoneSystem.GenerateLocations), new[] {typeof(ZoneSystem.ZoneLocation)} )]
+            static bool ScrewDnspyPrefix(ref ZoneSystem __instance, ref ZoneSystem.ZoneLocation location)
+            {
+                List<String> trace = new List<String>();
+
+                UnityEngine.Random.InitState(WorldGenerator.instance.GetSeed() + location.m_prefabName.GetStableHashCode());
+                int num = 0;
+                int num2 = 0;
+                int num3 = 0;
+                int num4 = 0;
+                int num5 = 0;
+                int num6 = 0;
+                int num7 = 0;
+                int num8 = 0;
+                float locationRadius = Mathf.Max(location.m_exteriorRadius, location.m_interiorRadius);
+                int num9 = location.m_prioritized ? 200000 : 100000;
+                int num10 = 0;
+                int num11 = __instance.CountNrOfLocation(location);
+                float num12 = 10000f;
+                if (location.m_centerFirst)
+                {
+                    num12 = location.m_minDistance;
+                }
+                if (location.m_unique && num11 > 0)
+                {
+                    return false;
+                }
+
+                int num13 = 0;
+                while (num13 < num9 && num11 < location.m_quantity)
+                {
+                    trace.Add("a:" + num13);
+
+                    Vector2i randomZone = __instance.GetRandomZone(num12);
+                    if (location.m_centerFirst)
+                    {
+                        num12 += 1f;
+                    }
+
+                    if (__instance.m_locationInstances.ContainsKey(randomZone))
+                    {
+                        trace.Add("ContainsKey");
+                        num++;
+                    }
+                    else if (!__instance.IsZoneGenerated(randomZone))
+                    {
+                        trace.Add("IsZoneGenerated");
+                        Vector3 zonePos = __instance.GetZonePos(randomZone);
+                        Heightmap.BiomeArea biomeArea = WorldGenerator.instance.GetBiomeArea(zonePos);
+                        if ((location.m_biomeArea & biomeArea) == (Heightmap.BiomeArea)0)
+                        {
+                            num4++;
+                            trace.Add("biomeArea");
+                        }
+                        else
+                        {
+                            for (int i = 0; i < 20; i++)
+                            {
+                                trace.Add("i:" + i);
+                                num10++;
+                                Vector3 randomPointInZone = __instance.GetRandomPointInZone(randomZone, locationRadius);
+                                float magnitude = randomPointInZone.magnitude;
+                                if (location.m_minDistance != 0f && magnitude < location.m_minDistance)
+                                {
+                                    num2++;
+                                    trace.Add("m_minDistance");
+                                }
+                                else if (location.m_maxDistance != 0f && magnitude > location.m_maxDistance)
+                                {
+                                    num2++;
+                                    trace.Add("m_maxDistance");
+                                }
+                                else
+                                {
+                                    Heightmap.Biome biome = WorldGenerator.instance.GetBiome(randomPointInZone);
+                                    if ((location.m_biome & biome) == Heightmap.Biome.None)
+                                    {
+                                        num3++;
+                                        trace.Add("m_biome");
+                                    }
+                                    else
+                                    {
+                                        randomPointInZone.y = WorldGenerator.instance.GetHeight(randomPointInZone.x, randomPointInZone.z);
+                                        float num14 = randomPointInZone.y - __instance.m_waterLevel;
+                                        if (num14 < location.m_minAltitude || num14 > location.m_maxAltitude)
+                                        {
+                                            num5++;
+                                            trace.Add("altitude");
+                                        }
+                                        else
+                                        {
+                                            if (location.m_inForest)
+                                            {
+                                                float forestFactor = WorldGenerator.GetForestFactor(randomPointInZone);
+                                                if (forestFactor < location.m_forestTresholdMin || forestFactor > location.m_forestTresholdMax)
+                                                {
+                                                    num6++;
+                                                    trace.Add("forestFactor");
+                                                    goto IL_27C;
+                                                }
+                                                trace.Add("noForestFactor");
+                                            }
+                                            float num15;
+                                            Vector3 vector;
+                                            WorldGenerator.instance.GetTerrainDelta(randomPointInZone, location.m_exteriorRadius, out num15, out vector);
+                                            if (num15 > location.m_maxTerrainDelta || num15 < location.m_minTerrainDelta)
+                                            {
+                                                num8++;
+                                                trace.Add("terrainDelta");
+                                            }
+                                            else
+                                            {
+                                                if (location.m_minDistanceFromSimilar <= 0f || !__instance.HaveLocationInRange(location.m_prefabName, location.m_group, randomPointInZone, location.m_minDistanceFromSimilar))
+                                                {
+                                                    __instance.RegisterLocation(location, randomPointInZone, false);
+                                                    num11++;
+                                                    trace.Add("register");
+                                                    break;
+                                                }
+                                                num7++;
+                                                trace.Add("noRegister");
+                                            }
+                                        }
+                                    }
+                                }
+                                IL_27C:;
+                            }
+                        }
+                    }
+                    num13++;
+                }
+
+                // CRLF...
+                //File.WriteAllLines("./locationTraces/" + location.m_prefabName + ".trace", trace);
+
+                File.WriteAllText("./locationTraces/" + location.m_prefabName + ".trace", 
+                    string.Join("\n", trace));
+
+                if (num11 < location.m_quantity)
+                {
+                    ZLog.LogWarning(string.Concat(new string[]
+                    {
+                        "Failed to place all ",
+                        location.m_prefabName,
+                        ", placed ",
+                        num11.ToString(),
+                        " out of ",
+                        location.m_quantity.ToString()
+                    }));
+                    //ZLog.DevLog("errorLocationInZone " + num.ToString());
+                    //ZLog.DevLog("errorCenterDistance " + num2.ToString());
+                    //ZLog.DevLog("errorBiome " + num3.ToString());
+                    //ZLog.DevLog("errorBiomeArea " + num4.ToString());
+                    //ZLog.DevLog("errorAlt " + num5.ToString());
+                    //ZLog.DevLog("errorForest " + num6.ToString());
+                    //ZLog.DevLog("errorSimilar " + num7.ToString());
+                    //ZLog.DevLog("errorTerrainDelta " + num8.ToString());
+                }
+
+                return false;
+            }
+
             [HarmonyPostfix]
             [HarmonyPatch(nameof(ZoneSystem.Start))]
             static void StartPostfix(ref ZoneSystem __instance)
             {
+
                 String date = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
 
                 Directory.CreateDirectory("./dumped");
@@ -263,48 +432,92 @@ namespace JotunnModExample
                     ZLog.Log("staticSolidRayMask: " + Convert.ToString(STATIC_MASK, 2));
                     ZLog.Log("terrainRayMask: " + Convert.ToString(TERRAIN_MASK, 2));
 
-
-                    HashSet<string> tinyRadius = new HashSet<string>(
-                        new string[] {"CloudberryBush", 
-                            "Beech_small1", "Beech_small2", "Bush01", "Pickable_Thistle",
-                            "BlueberryBush", "RaspberryBush", "Pickable_Mushroom",
+                    // nano-sized tidbits (pickable mushrooms, seeds...)
+                    // 0.28
+                    HashSet<string> nanoRadius = new HashSet<string>(
+                        new string[] {"Pickable_Thistle",
+                            "Pickable_Mushroom",
                             "Pickable_Dandelion", "Pickable_Flint", "Pickable_Stone",
                             "Pickable_SeedTurnip", "Pickable_SeedCarrot",
                             "Pickable_Mushroom_Magecap", "Pickable_Mushroom_JotunPuffs",
-                            "YggaShoot_small1",
+                            "CloudberryBush", "Pickable_Branch",
                         }
                     );
 
-                    // ~.45
+                    // small bushes and small trees
+                    // 0.70
+                    HashSet<string> tinyRadius = new HashSet<string>(
+                        new string[] {
+                            "Beech_small1", "Beech_small2", "Bush01", "YggaShoot_small1", "shrub_2",
+                            "Bush01_heath"
+                        }
+                    );
+
+                    // 0.95
                     HashSet<string> smallRadius = new HashSet<string>(
-                        new string[] {"Beech1", "Birch1", "Birch1_aut", "Birch2", "Oak1", "Birch2_aut",
-                            "FirTree", "Pinetree_01", "Bush02_en", "FirTree_small_dead",
-                            "SwampTree",
-                            "FirTree_small", "Bush01_heath", "Pickable_Branch",
-                            "FirTree", "MineRock_Obsidian"
+                        new string[] {
+                            "Beech1", "Birch1", "Birch1_aut", "Birch2",  "Birch2_aut",
+                            "Pinetree_01", "MineRock_Obsidian"
+                        }
+                    );
+
+                    // 1.10
+                    HashSet<string> mildRadius = new HashSet<string>(
+                        new string[] {
+                            "FirTree", "Bush02_en", "FirTree_small_dead",
+                            "FirTree_small",
+                            "RaspberryBush", "BlueberryBush", "SwampTree1",
+                            "StatueEvil", "MineRock_Tin"
+                        }
+                    );
+
+                    // 2.20
+                    HashSet<string> bigRadius = new HashSet<string>(
+                        new string[] {
+                             "Oak1", "SwampTree2",
+                             "YggaShoot1", "YggaShoot2", "YggaShoot3", "stubbe"
                         }
                     );
 
                     Dictionary<string, float> customRadius = new Dictionary<string, float>();
+                    customRadius.Add("cliff_mistlands1", 11);
+                    customRadius.Add("cliff_mistlands1_creep", 11);
+                    customRadius.Add("cliff_mistlands2", 11);
+                    customRadius.Add("rock4_forest", 12);
+                    customRadius.Add("rock4_copper", 12);
+                    customRadius.Add("YggdrasilRoot", 9);
+                    customRadius.Add("giant_helmet1", 7);
+                    customRadius.Add("giant_helmet2", 5); // only front of helmet1
+                    customRadius.Add("rock4_coast", 7);
+
+                    // these are not heavily tested or measured
+                    /*
+                    customRadius.Add("rock4_coast", 13);
+                    customRadius.Add("rock4_heath", 13);
+                    customRadius.Add("HeathRockPillar", 4);
+                    customRadius.Add("rock2_heath", 6);
+                    customRadius.Add("rock3_mountain", 7);
+                    customRadius.Add("rock1_mountain", 8);
+                    customRadius.Add("rock2_mountain", 7);
                     customRadius.Add("SwampTree2", 1);
                     customRadius.Add("SwampTree2_log", 12); // very rectangular
                     customRadius.Add("FirTree_oldLog", 2);
-                    customRadius.Add("stubbe", 2);
+                    customRadius.Add("stubbe", 1.2f);
                     customRadius.Add("StatueEvil", 1.2f);
                     customRadius.Add("shrub_2_heath", .7f);
                     customRadius.Add("shrub_2", .7f);
-                    customRadius.Add("Leviathan", 40); // redundant since ocean empty
+                    customRadius.Add("Leviathan", 30); // redundant since ocean mostly empty anyways
                     customRadius.Add("YggaShoot1", 3);
                     customRadius.Add("YggaShoot2", 4);
                     customRadius.Add("YggaShoot3", 3);
-                    customRadius.Add("cliff_mistlands1", 12);
                     customRadius.Add("cliff_mistlands2", 9);
                     customRadius.Add("giant_helmet1", 6);
                     customRadius.Add("giant_helmet2", 4);
                     customRadius.Add("giant_sword1", 2);
                     customRadius.Add("giant_sword2", 1);
                     customRadius.Add("giant_ribs", 6);
-                    customRadius.Add("YggdrasilRoot", 6);
+                    
+                    customRadius.Add("silvervein", 0);*/
 
 
 
@@ -345,10 +558,16 @@ namespace JotunnModExample
                             float temp = 0;
                             if (customRadius.TryGetValue(veg.m_prefab.name, out temp))
                                 radius = temp;
+                            else if (nanoRadius.Contains(veg.m_prefab.name))
+                                radius = 0.28f;
                             else if (tinyRadius.Contains(veg.m_prefab.name))
-                                radius = .18f;
+                                radius = 0.70f;
                             else if (smallRadius.Contains(veg.m_prefab.name))
-                                radius = .45f;
+                                radius = 0.95f;
+                            else if (mildRadius.Contains(veg.m_prefab.name))
+                                radius = 1.10f;
+                            else if (bigRadius.Contains(veg.m_prefab.name))
+                                radius = 2.20f;
 
                             ZLog.Log("Dumping vegetation block layer " + veg.m_prefab.name + ", radius: " + radius);
                             pkg.Write(radius);
