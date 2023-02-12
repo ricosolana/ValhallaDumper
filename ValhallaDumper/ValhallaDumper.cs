@@ -1,11 +1,4 @@
-﻿// JotunnModExample
-// A Valheim mod using Jötunn
-// Used to demonstrate the libraries capabilities
-// 
-// File:    JotunnModExample.cs
-// Project: JotunnModExample
-
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using System;
@@ -19,15 +12,15 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-namespace JotunnModExample
+namespace ValhallaDumper
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
-    internal class JotunnModExample : BaseUnityPlugin
+    internal class ValhallaDumper : BaseUnityPlugin
     {
         // BepInEx' plugin metadata
-        public const string PluginGUID = "com.jotunn.JotunnModExample";
-        public const string PluginName = "JotunnModExample";
-        public const string PluginVersion = "2.7.7";
+        public const string PluginGUID = "com.crzi.ValhallaDumper";
+        public const string PluginName = "ValhallaDumper";
+        public const string PluginVersion = "1.0.0";
 
         Harmony _harmony;
 
@@ -37,10 +30,6 @@ namespace JotunnModExample
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), harmonyInstanceId: PluginGUID);
 
             ZLog.Log("Loading ValhallaDumper");
-
-            //Directory.CreateDirectory("./locationTraces");
-
-
         }
 
         [HarmonyPatch(typeof(ZoneSystem))]
