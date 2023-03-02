@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using BepInEx;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,18 +12,53 @@ namespace ValhallaDumper
 {
     internal class ZoneDumper
     {
+        static bool loaded = false;
 
         [HarmonyPatch(typeof(ZoneSystem))]
         class ZoneSystemPatch
         {
-            [HarmonyPostfix]
-            [HarmonyPatch(nameof(ZoneSystem.Start))]
-            static void StartPostfix(ref ZoneSystem __instance)
+            [HarmonyPrefix]
+            [HarmonyPatch(nameof(ZoneSystem.Update))]
+            static void UpdatePrefix(ref ZoneSystem __instance)
             {
+                if (loaded || !DungeonDB.instance)
+                    return;
+
+                loaded = true;
+
+                /*
+                foreach (var pair in __instance.m_locationsByHash)
+                {
+                    var zoneLocation = pair.Value;
+
+                    Location componentInChildren = zoneLocation.m_location;
+                    var interiorTransform = componentInChildren.m_interiorTransform;
+                    if (interiorTransform && componentInChildren.m_generator) {
+                        ZLog.Log(zoneLocation.m_prefabName);
+                        ZLog.Log(" - m_generatorPosition: " + zoneLocation.m_generatorPosition);
+                        ZLog.Log(" - m_interiorTransform: ");
+
+                        ZLog.Log("   - .name: " + interiorTransform.name);
+                        ZLog.Log("   - .parent.name: " + interiorTransform.parent.name);
+
+                        ZLog.Log("   - .localPosition: " + interiorTransform.localPosition);
+                        ZLog.Log("   - .localRotation: " + interiorTransform.localRotation);
+
+                        int count = interiorTransform.childCount;
+                        if (count > 0)
+                        {
+                            ZLog.Log("   - .children: ");
+                            for (int i=0; i < count; i++)
+                            {
+                                ZLog.Log("     - " + interiorTransform.GetChild(i).name);
+                            }
+                        }                        
+                    }
+                }*/
+
+
 
                 String date = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
-
-                Directory.CreateDirectory("./dumped");
 
                 {
                     ZLog.Log("Dumping Prefabs");
@@ -39,8 +75,8 @@ namespace ValhallaDumper
 
                     var staticSolidRayMask = LayerMask.GetMask(new string[]
                     {
-                                "static_solid",
-                                "terrain"
+                        "static_solid",
+                        "terrain"
                     });
 
                     // Dump prefabs
@@ -57,12 +93,80 @@ namespace ValhallaDumper
                             ZLog.Log("staticSolid: " + prefab.name);
 
                         pkg.Write(view.GetPrefabName());
-                        pkg.Write(view.m_distant);
-                        pkg.Write(view.m_persistent);
+
                         pkg.Write((int)view.m_type);
-                        pkg.Write(view.m_syncInitialScale);
-                        if (view.m_syncInitialScale)
-                            pkg.Write(view.gameObject.transform.localScale);
+
+                        //pkg.Write(view.m_syncInitialScale);
+                        //if (view.m_syncInitialScale)
+                        pkg.Write(view.gameObject.transform.localScale);
+
+                        List<bool> flags = new List<bool>();
+
+                        flags.Add(view.m_syncInitialScale);
+                        flags.Add(view.m_distant);
+                        flags.Add(view.m_persistent);
+
+                        //flags.Add((int)view.m_type == 1);
+                        //flags.Add((int)view.m_type - 2 == 1);
+
+                        flags.Add(prefab.GetComponent<Piece>()              != null);
+
+                        flags.Add(prefab.GetComponent<Bed>()                != null);
+                        flags.Add(prefab.GetComponent<Door>()               != null);
+                        flags.Add(prefab.GetComponent<Chair>()              != null);
+                        flags.Add(prefab.GetComponent<Ship>()               != null);
+                        flags.Add(prefab.GetComponent<Fish>()               != null); // Fish is also ItemDrop...
+                        flags.Add(prefab.GetComponent<Plant>()              != null);
+                        flags.Add(prefab.GetComponent<ArmorStand>()         != null);
+
+                        flags.Add(prefab.GetComponent<ItemDrop>()           != null);
+                        flags.Add(prefab.GetComponent<Pickable>()           != null);
+                        flags.Add(prefab.GetComponent<PickableItem>()       != null);
+
+                        flags.Add(prefab.GetComponent<CookingStation>()     != null);
+                        flags.Add(prefab.GetComponent<CraftingStation>()    != null);
+                        flags.Add(prefab.GetComponent<Smelter>()            != null);
+                        flags.Add(prefab.GetComponent<Fireplace>()          != null);
+
+                        flags.Add(prefab.GetComponent<WearNTear>()          != null);
+                        flags.Add(prefab.GetComponent<Destructible>()       != null);
+                        //flags.Add(prefab.GetComponent<DropOnDestroyed>()    != null);
+                        //flags.Add(prefab.GetComponent<CharacterDrop>()      != null);
+                        flags.Add(prefab.GetComponent<ItemStand>()          != null);
+                        //flags.Add(prefab.GetComponent<Ragdoll>()            != null);
+
+                        flags.Add(prefab.GetComponent<AnimalAI>()           != null);
+                        flags.Add(prefab.GetComponent<MonsterAI>()          != null);
+                        flags.Add(prefab.GetComponent<Tameable>()           != null);
+                        flags.Add(prefab.GetComponent<Procreation>()        != null);
+
+                        //flags.Add(prefab.GetComponent<Character>()        != null);
+                        //flags.Add(prefab.GetComponent<Humanoid>()         != null);
+                        
+                        // I still cant figure the difference between these
+                        //  only MineRock seems to be able to be hidden from view... not sure...
+                        flags.Add(prefab.GetComponent<MineRock>()           != null);
+                        flags.Add(prefab.GetComponent<MineRock5>()          != null);
+                                                
+                        //flags.Add(prefab.GetComponent<Projectile>()       != null);
+                        
+                        flags.Add(prefab.GetComponent<TreeBase>()           != null);      // natural tree
+                        flags.Add(prefab.GetComponent<TreeLog>()            != null);       // chopped down tree
+
+                        flags.Add(prefab.GetComponent<ZSFX>()               != null);
+                        flags.Add(prefab.GetComponent<TimedDestruction>()   != null && prefab.GetComponent<ZSFX>() == null && prefab.GetComponent<ParticleSystem>() != null);
+                        flags.Add(prefab.GetComponent<Aoe>() != null);
+
+                        flags.Add(prefab.GetComponent<DungeonGenerator>() != null);
+
+                        ulong mask = 0;
+                        for (int i=0; i < flags.Count; i++)
+                        {
+                            mask |= flags[i] ? (ulong)1 << i : 0;
+                        }
+
+                        pkg.Write(mask);
+
                     }
 
                     File.WriteAllBytes("./dumped/prefabs.pkg", pkg.GetArray());
@@ -71,6 +175,13 @@ namespace ValhallaDumper
                 }
 
 
+
+                //List<DungeonGenerator> dungeons = new List<DungeonGenerator>();
+                //List<int> dungeons = new List<int>();
+
+                //HashSet<int> dungeons = new HashSet<int>(); // Contains prefab hashes
+
+                Dictionary<int, DungeonGenerator> dungeons = new Dictionary<int, DungeonGenerator>();
 
                 {
                     ZLog.Log("Dumping ZoneLocations");
@@ -113,24 +224,36 @@ namespace ValhallaDumper
                     pkg.Write(locations.Count);
                     foreach (var loc in locations)
                     {
+                        //var generator = loc.m_prefab.GetComponent<Location>().m_generator;
+                        //if (generator)
+                            //dungeons.Add(loc.m_hash);
+
+                        //if (generator)
+                        //dungeons.Add(generator.gameObject.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
+                        //if (loc.m_location.m_generator)
+                        //dungeons.Add(loc.m_hash);
+                        //dungeons.Add(loc.m_location.m_generator);
+
                         loc.m_prefab.transform.position = Vector3.zero;
                         loc.m_prefab.transform.rotation = Quaternion.identity;
                         //if (loc.m_prefab.transform.localScale != ZNetScene.instance.)
 
                         pkg.Write(loc.m_prefabName);
+                        //pkg.Write(loc.m_location.m_generator != null);
+                        //pkg.Write(loc.m_location.m_generator ? loc.m_location.m_generator.gameObject.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode() : 0);
                         ///pkg.Write(loc.m_prefab.name);       // m_prefab appears to be null
                         pkg.Write((int)loc.m_biome);
                         pkg.Write((int)loc.m_biomeArea);
                         pkg.Write(loc.m_location.m_applyRandomDamage);
                         pkg.Write(loc.m_centerFirst);
                         pkg.Write(loc.m_location.m_clearArea);
-                        pkg.Write(loc.m_location.m_useCustomInteriorTransform);
+                        //pkg.Write(loc.m_location.m_useCustomInteriorTransform);
                         pkg.Write(loc.m_exteriorRadius);
                         pkg.Write(loc.m_interiorRadius);
                         pkg.Write(loc.m_forestTresholdMin);
                         pkg.Write(loc.m_forestTresholdMax);
-                        pkg.Write(loc.m_interiorPosition);
-                        pkg.Write(loc.m_generatorPosition);
+                        //pkg.Write(loc.m_interiorPosition);
+                        //pkg.Write(loc.m_generatorPosition);
                         pkg.Write(loc.m_group);
                         pkg.Write(loc.m_iconAlways);
                         pkg.Write(loc.m_iconPlaced);
@@ -142,7 +265,6 @@ namespace ValhallaDumper
                         pkg.Write(loc.m_minTerrainDelta);
                         pkg.Write(loc.m_maxTerrainDelta);
                         pkg.Write(loc.m_minDistanceFromSimilar);
-                        //pkg.Write(loc.m_prioritized);
                         pkg.Write(loc.m_prioritized ? 200000 : 100000); // spawnAttempts
                         pkg.Write(loc.m_quantity);
                         pkg.Write(loc.m_randomRotation);
@@ -166,7 +288,15 @@ namespace ValhallaDumper
                                 var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
                                     view.gameObject.transform.position, view.gameObject.transform.rotation);
 
-                                views.Add(obj.GetComponent<ZNetView>());
+                                ZNetView nv = obj.GetComponent<ZNetView>();
+                                views.Add(nv);
+
+                                int hash = nv.GetPrefabName().GetStableHashCode();
+
+                                var dg = obj.GetComponent<DungeonGenerator>();
+                                if (dg && !dungeons.ContainsKey(hash))
+                                    dungeons[hash] = dg;
+                                //dungeons.Add(obj.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                             }
                         }
 
@@ -174,15 +304,13 @@ namespace ValhallaDumper
                         foreach (var view in views)
                         {
                             pkg.Write(view.GetPrefabName().GetStableHashCode());
-                            //pkg.Write(view.gameObject.transform.position);
-                            //pkg.Write(view.gameObject.transform.rotation);
                             pkg.Write(view.m_zdo.m_position);
                             pkg.Write(view.m_zdo.m_rotation);
                         }
 
                         // free (not really needed)
-                        foreach (var view in views)
-                            UnityEngine.GameObject.Destroy(view.gameObject);
+                        //foreach (var view in views)
+                            //UnityEngine.GameObject.Destroy(view.gameObject);
 
                         ZNetView.FinishGhostInit();
                     }
@@ -190,6 +318,225 @@ namespace ValhallaDumper
                     File.WriteAllBytes("./dumped/zoneLocations.pkg", pkg.GetArray());
 
                     ZLog.Log("Dumped " + locations.Count + "/" + ZoneSystem.instance.m_locations.Count + " ZoneLocations");
+                }
+
+
+
+                {
+                    ZLog.Log("Dumping Dungeons");
+
+                    // Dump dungeons
+                    ZPackage pkg = new ZPackage();
+
+                    pkg.Write(date);
+                    pkg.Write(Version.GetVersionString()); // write version for reference purposes
+                    pkg.Write(dungeons.Count);
+                    foreach (var pair in dungeons)
+                    {
+                        //var loc = __instance.m_locationsByHash[hash];
+
+                        var dungeon = pair.Value;
+
+                        //loc.m_prefab.transform.position = Vector3.zero;
+                        //loc.m_prefab.transform.rotation = Quaternion.identity;
+
+                        //var prefab = loc.m_location.m_generator.gameObject; // loc.m_prefab;
+
+                        //var prefab = ZNetScene.instance.GetPrefab(prefabHash);
+
+                        //var dungeon = prefab.GetComponent<Location>().m_generator;
+
+                        // Initialize this netview
+                        //var dungeon = UnityEngine.Object.Instantiate<GameObject>(prefab,
+                        //    prefab.transform.position, prefab.transform.rotation).GetComponent<DungeonGenerator>();//.GetComponent<Location>().m_generator;
+
+                        //dungeon.transform.position = new Vector3(0, 0, 0);
+                        //dungeon.transform.rotation = Quaternion.identity;
+
+                        /*
+                        // set all active like in laceLocations()
+                        foreach (var view in loc.m_netViews)
+                        {
+                            view.gameObject.SetActive(true);
+                        }
+
+                        List<ZNetView> views = new List<ZNetView>();
+                        ZNetView.StartGhostInit();
+                        foreach (var view in dunge.m_netViews) // .m_prefab.GetComponent<Location>()
+                        {
+                            if (view.gameObject.activeSelf)
+                            {
+                                var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
+                                    view.gameObject.transform.position, view.gameObject.transform.rotation);
+
+                                views.Add(obj.GetComponent<ZNetView>());
+                            }
+                        }
+                        ZNetView.FinishGhostInit();*/
+
+                        //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
+                        pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
+
+                        pkg.Write((int)dungeon.m_algorithm);
+                        pkg.Write(dungeon.m_alternativeFunctionality);
+                        pkg.Write(dungeon.m_campRadiusMax);
+                        pkg.Write(dungeon.m_campRadiusMin);
+                        pkg.Write(dungeon.m_doorChance);
+
+                        pkg.Write(dungeon.m_doorTypes.Count);
+                        foreach (var door in dungeon.m_doorTypes)
+                        {
+                            pkg.Write(door.m_prefab.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
+                            pkg.Write(door.m_connectionType);
+                            pkg.Write(door.m_chance);
+                        }
+
+                        //ZLog.Log("dungeon.m_gridSize: " + dungeon.m_gridSize);
+
+                        pkg.Write(dungeon.m_gridSize); // redundant? (only used for grid/meadows camp)
+                        pkg.Write(dungeon.m_maxRooms);
+                        pkg.Write(dungeon.m_maxTilt);
+                        pkg.Write(dungeon.m_minAltitude);
+                        pkg.Write(dungeon.m_minRequiredRooms);
+                        pkg.Write(dungeon.m_minRooms);
+                        //pkg.Write(dungeon.m_originalPosition); // TODO fix
+                        pkg.Write(dungeon.m_perimeterBuffer);
+                        pkg.Write(dungeon.m_perimeterSections);
+
+                        pkg.Write(dungeon.m_requiredRooms.Count);
+                        foreach (var room in dungeon.m_requiredRooms)
+                        {
+                            pkg.Write(room);
+                        }
+
+                        pkg.Write(dungeon.m_spawnChance);
+                        pkg.Write((int)dungeon.m_themes);
+                        pkg.Write(dungeon.m_tileWidth);
+                        //pkg.Write(dungeon.m_useCustomInteriorTransform); // TODO fix
+
+                        // Force dungeon to collect its rooms
+                        dungeon.SetupAvailableRooms();
+
+                        pkg.Write(DungeonGenerator.m_availableRooms.Count);
+                        foreach (var roomData in DungeonGenerator.m_availableRooms)
+                        {
+                            var room = roomData.m_room;
+                            var netviews = roomData.m_netViews;
+
+                            /*
+                            {
+                                foreach (var view in netviews)
+                                {
+                                    view.gameObject.SetActive(false);
+                                }
+
+                                //var components = roomData.m_room.transform.GetComponents<MonoBehaviour>();
+                                var components = roomData.m_room.transform.GetComponents(typeof(MonoBehaviour));
+
+                                ZLog.Log(room.name);
+                                ZLog.Log(" - Components: ");
+                                foreach (var component in components)
+                                {
+                                    ZLog.Log("   - " + component.GetType().Name);
+                                }
+
+                                var childComponents = roomData.m_room.transform
+                                    .GetComponentsInChildren(typeof(MonoBehaviour), false);
+
+                                ZLog.Log(" - ChildComponents: ");
+                                foreach (var component in childComponents)
+                                {
+                                    ZLog.Log("   - " + component.GetType().Name);
+                                }
+
+                                ZLog.Log(" - Children: ");
+                                var childCount = roomData.m_room.transform.childCount;
+                                for (int ic = 0; ic < childCount; ic++)
+                                {
+                                    var child = roomData.m_room.transform.GetChild(ic);
+
+                                    ZLog.Log("   - " + child.name);
+                                }
+                            }*/
+
+                            pkg.Write(Utils.GetPrefabName(room.gameObject));
+                            pkg.Write(room.m_divider);
+                            //pkg.Write(room.m_enabled);
+                            pkg.Write(room.m_endCap);
+                            pkg.Write(room.m_endCapPrio);
+                            pkg.Write(room.m_entrance);
+                            pkg.Write(room.m_faceCenter);
+                            pkg.Write(room.m_minPlaceOrder);
+                            //pkg.Write(room.m_musicPrefab)
+                            pkg.Write(room.m_perimeter);
+
+                            var connections = room.GetConnections();
+                            pkg.Write(connections.Length);
+                            foreach (var conn in connections)
+                            {
+                                pkg.Write(conn.m_type);
+                                pkg.Write(conn.m_entrance);
+                                pkg.Write(conn.m_allowDoor);
+                                pkg.Write(conn.m_doorOnlyIfOtherAlsoAllowsDoor);
+
+                                pkg.Write(conn.transform.localPosition);
+                                pkg.Write(conn.transform.localRotation);
+                            }
+
+
+
+
+
+                            List<ZNetView> views = new List<ZNetView>();
+                            ZNetView.StartGhostInit();
+                            foreach (var view in netviews) // .m_prefab.GetComponent<Location>()
+                            {
+                                if (view.gameObject.activeSelf)
+                                {
+                                    //var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
+                                    //view.gameObject.transform.position, view.gameObject.transform.rotation);
+
+                                    //views.Add(obj.GetComponent<ZNetView>());
+
+                                    views.Add(view);
+                                }
+                            }
+
+                            Quaternion quat = Quaternion.Inverse(room.transform.rotation);
+
+                            pkg.Write(views.Count);
+                            foreach (var view in views)
+                            {
+                                pkg.Write(view.GetPrefabName().GetStableHashCode());
+                                //pkg.Write(view.m_zdo.m_position);
+                                //pkg.Write(view.m_zdo.m_rotation);
+
+                                // This writes the local transforms (as it should be)
+                                //pkg.Write(quat * (view.m_zdo.m_position - room.transform.position));
+                                //pkg.Write(quat * view.m_zdo.m_rotation);
+
+                                pkg.Write(quat * (view.gameObject.transform.position - room.transform.position));
+                                pkg.Write(quat * view.gameObject.transform.rotation);
+                            }
+
+
+
+                            // dump randomSpawns
+
+
+
+                            pkg.Write(room.m_size);
+                            pkg.Write((int)room.m_theme);
+                            pkg.Write(room.m_weight);
+                            pkg.Write(room.transform.position);
+                            pkg.Write(room.transform.rotation);
+                        }
+                    }
+
+                    File.WriteAllBytes("./dumped/dungeons.pkg", pkg.GetArray());
+
+                    ZLog.Log("Dumped " + dungeons.Count + " dungeons");
+
                 }
 
 
@@ -408,7 +755,7 @@ namespace ValhallaDumper
                             pkg.Write(0.0f);
                         }
 
-                        Destroy(obj);
+                        UnityEngine.GameObject.Destroy(obj);
 
                         /*else
                         {
@@ -492,6 +839,9 @@ namespace ValhallaDumper
 
                     ZLog.Log("Dumped " + vegetation.Count + "/" + ZoneSystem.instance.m_vegetation.Count + " ZoneVegetation");
                 }
+
+
+
             }
         }
 

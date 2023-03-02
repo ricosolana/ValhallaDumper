@@ -11,10 +11,12 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+//using Jotunn.Utils;
 
 namespace ValhallaDumper
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
+    //[NetworkCompatibility(CompatibilityLevel.ServerMustHaveMod, VersionStrictness.Minor)]
     internal class ValhallaDumper : BaseUnityPlugin
     {
         // BepInEx' plugin metadata
@@ -27,6 +29,9 @@ namespace ValhallaDumper
         private void Awake()
         {
             Game.isModded = true;
+
+            Directory.CreateDirectory("./dumped");
+
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), harmonyInstanceId: PluginGUID);
 
             ZLog.Log("Loading ValhallaDumper");
