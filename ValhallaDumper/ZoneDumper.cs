@@ -483,7 +483,10 @@ namespace ValhallaDumper
                                 pkg.Write(conn.transform.localRotation);
                             }
 
-
+                            foreach (var view in netviews)
+                            {
+                                view.gameObject.SetActive(true);
+                            }
 
 
 
