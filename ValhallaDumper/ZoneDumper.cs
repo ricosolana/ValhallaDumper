@@ -7,12 +7,42 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using static MonoMod.InlineRT.MonoModRule;
 
 namespace ValhallaDumper
 {
     internal class ZoneDumper
     {
         static bool loaded = false;
+
+        public static void RecurseObjectPrint(GameObject gameObject, uint depth)
+        {
+            String currentDepth = new String(' ', (int)depth * 2) + " - ";
+            String nestedDepth = new String(' ', (int)(depth + 1) * 2) + " - ";
+            
+            ZLog.LogWarning(currentDepth + "name: " + gameObject.name);
+            var monos = gameObject.GetComponents(typeof(MonoBehaviour));
+            if (monos.Length > 0)
+            {
+                ZLog.LogWarning(currentDepth + "Monos: ");
+                foreach (var mono in monos)
+                {
+                    ZLog.LogWarning(nestedDepth + mono.GetType().Name);
+                }
+            }
+
+            int childCount = gameObject.transform.childCount;
+            if (childCount > 0)
+            {
+                ZLog.LogWarning(currentDepth + "children: ");
+                for (int i = 0; i < childCount; i++)
+                {
+                    var child = gameObject.transform.GetChild(i).gameObject;
+                    RecurseObjectPrint(child, depth + 1);
+                }
+            }
+            
+        }
 
         [HarmonyPatch(typeof(ZoneSystem))]
         class ZoneSystemPatch
@@ -58,7 +88,7 @@ namespace ValhallaDumper
 
 
 
-                String date = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
+                String comment = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
 
                 {
                     ZLog.Log("Dumping Prefabs");
@@ -82,7 +112,7 @@ namespace ValhallaDumper
                     // Dump prefabs
                     ZPackage pkg = new ZPackage();
 
-                    pkg.Write(date);
+                    pkg.Write(comment);
                     pkg.Write(Version.GetVersionString()); // write version for reference purposes
                     pkg.Write(prefabs.Count);
                     foreach (var prefab in prefabs)
@@ -181,7 +211,8 @@ namespace ValhallaDumper
 
                 //HashSet<int> dungeons = new HashSet<int>(); // Contains prefab hashes
 
-                Dictionary<int, DungeonGenerator> dungeons = new Dictionary<int, DungeonGenerator>();
+                Dictionary<int, KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>> dungeons 
+                    = new Dictionary<int, KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>>();
 
                 {
                     ZLog.Log("Dumping ZoneLocations");
@@ -219,7 +250,7 @@ namespace ValhallaDumper
                     // Dump locations
                     ZPackage pkg = new ZPackage();
 
-                    pkg.Write(date);
+                    pkg.Write(comment);
                     pkg.Write(Version.GetVersionString()); // write version for reference purposes
                     pkg.Write(locations.Count);
                     foreach (var loc in locations)
@@ -295,7 +326,7 @@ namespace ValhallaDumper
 
                                 var dg = obj.GetComponent<DungeonGenerator>();
                                 if (dg && !dungeons.ContainsKey(hash))
-                                    dungeons[hash] = dg;
+                                    dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(loc, dg);
                                 //dungeons.Add(obj.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                             }
                         }
@@ -328,14 +359,16 @@ namespace ValhallaDumper
                     // Dump dungeons
                     ZPackage pkg = new ZPackage();
 
-                    pkg.Write(date);
+                    pkg.Write(comment);
                     pkg.Write(Version.GetVersionString()); // write version for reference purposes
                     pkg.Write(dungeons.Count);
                     foreach (var pair in dungeons)
                     {
                         //var loc = __instance.m_locationsByHash[hash];
 
-                        var dungeon = pair.Value;
+                        var zoneLocation = pair.Value.Key;
+                        var loc = zoneLocation.m_location;
+                        var dungeon = pair.Value.Value;
 
                         //loc.m_prefab.transform.position = Vector3.zero;
                         //loc.m_prefab.transform.rotation = Quaternion.identity;
@@ -376,6 +409,65 @@ namespace ValhallaDumper
 
                         //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                         pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
+
+                        pkg.Write(zoneLocation.m_interiorPosition);
+                        pkg.Write(zoneLocation.m_generatorPosition);
+
+                        if (loc.m_useCustomInteriorTransform)
+                        {
+                            //pkg.Write(loc.m_useCustomInteriorTransform);
+                            //if (loc.m_interiorTransform && loc.m_generator)
+                            {
+                                //bool anyNull = zoneLocation.m_interiorPosition == null
+                                //|| zoneLocation.m_generatorPosition == null;
+
+                                //if (loc.m_useCustomInteriorTransform != anyNull)
+                                //ZLog.LogError("hmm, m_useCustomInteriorTransform but positions are null");
+
+                                //pkg.Write(loc.m_useCustomInteriorTransform);
+
+                                
+
+                                ///ZLog.LogWarning(dungeon.name + " " 
+                                ///    + zoneLocation.m_interiorPosition + " | " 
+                                ///    + zoneLocation.m_generatorPosition);
+                                ///
+                                ///RecurseObjectPrint(loc.m_interiorTransform.gameObject, 0);
+
+                                //pkg.Write(zoneLocation.m_interiorPosition);
+                                //pkg.Write(zoneLocation.m_generatorPosition);
+
+                                //bool anyEmpty = zoneLocation.m_interiorPosition == null || zoneLocation.m_generatorPosition == null
+                                //    || zoneLocation.m_interiorPosition == Vector3.zero || zoneLocation.m_generatorPosition == Vector3.zero;
+                                //
+                                //if (loc.m_useCustomInteriorTransform == anyEmpty)
+                                //    ZLog.LogError("Dungeon m_useCustomInteriorTransform mismatch with transform value");
+
+                                //try
+                                //{
+                                //    ZLog.LogWarning("interior transform: ");
+                                //    ZLog.LogWarning(" - name: " + loc.m_interiorTransform.name); // Dungeon name
+                                //    ZLog.LogWarning(" - parent.name: " + loc.m_interiorTransform.parent.name); // Location name
+                                //
+                                //    ZLog.LogWarning(" - children: ");
+                                //    int childCount1 = loc.m_interiorTransform.childCount;
+                                //    for (int i = 0; i < childCount1; i++)
+                                //    {
+                                //        var child = loc.m_interiorTransform.GetChild(i);
+                                //        var childCount2 = child.childCount;
+                                //        ZLog.LogWarning("   - " + child.name + ":");
+                                //        for (int j = 0; j < childCount2; j++)
+                                //        {
+                                //            var child2 = child.GetChild(j);
+                                //            ZLog.LogWarning("     - " + child2.name);
+                                //        }
+                                //    }
+                                //}
+                                //catch (Exception e) { }
+                            }
+                        }
+
+
 
                         pkg.Write((int)dungeon.m_algorithm);
                         pkg.Write(dungeon.m_alternativeFunctionality);
@@ -488,19 +580,12 @@ namespace ValhallaDumper
                                 view.gameObject.SetActive(true);
                             }
 
-
-
                             List<ZNetView> views = new List<ZNetView>();
                             ZNetView.StartGhostInit();
                             foreach (var view in netviews) // .m_prefab.GetComponent<Location>()
                             {
                                 if (view.gameObject.activeSelf)
                                 {
-                                    //var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
-                                    //view.gameObject.transform.position, view.gameObject.transform.rotation);
-
-                                    //views.Add(obj.GetComponent<ZNetView>());
-
                                     views.Add(view);
                                 }
                             }
@@ -677,7 +762,7 @@ namespace ValhallaDumper
 
 
 
-                    pkg.Write(date);
+                    pkg.Write(comment);
                     pkg.Write(Version.GetVersionString());
                     pkg.Write(vegetation.Count);
                     foreach (var veg in vegetation)
