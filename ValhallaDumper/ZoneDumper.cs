@@ -134,7 +134,7 @@ namespace ValhallaDumper
 
                         flags.Add(view.m_syncInitialScale);
                         flags.Add(view.m_distant);
-                        flags.Add(view.m_persistent);
+                        flags.Add(!view.m_persistent); // whether temporary
 
                         //flags.Add((int)view.m_type == 1);
                         //flags.Add((int)view.m_type - 2 == 1);
@@ -188,6 +188,11 @@ namespace ValhallaDumper
                         flags.Add(prefab.GetComponent<Aoe>() != null);
 
                         flags.Add(prefab.GetComponent<DungeonGenerator>() != null);
+
+                        flags.Add(prefab.GetComponent<TerrainModifier>() != null);
+
+                        flags.Add(prefab.GetComponent<Player>() != null);
+                        flags.Add(prefab.GetComponent<TombStone>() != null);
 
                         ulong mask = 0;
                         for (int i=0; i < flags.Count; i++)
@@ -370,44 +375,6 @@ namespace ValhallaDumper
                         var loc = zoneLocation.m_location;
                         var dungeon = pair.Value.Value;
 
-                        //loc.m_prefab.transform.position = Vector3.zero;
-                        //loc.m_prefab.transform.rotation = Quaternion.identity;
-
-                        //var prefab = loc.m_location.m_generator.gameObject; // loc.m_prefab;
-
-                        //var prefab = ZNetScene.instance.GetPrefab(prefabHash);
-
-                        //var dungeon = prefab.GetComponent<Location>().m_generator;
-
-                        // Initialize this netview
-                        //var dungeon = UnityEngine.Object.Instantiate<GameObject>(prefab,
-                        //    prefab.transform.position, prefab.transform.rotation).GetComponent<DungeonGenerator>();//.GetComponent<Location>().m_generator;
-
-                        //dungeon.transform.position = new Vector3(0, 0, 0);
-                        //dungeon.transform.rotation = Quaternion.identity;
-
-                        /*
-                        // set all active like in laceLocations()
-                        foreach (var view in loc.m_netViews)
-                        {
-                            view.gameObject.SetActive(true);
-                        }
-
-                        List<ZNetView> views = new List<ZNetView>();
-                        ZNetView.StartGhostInit();
-                        foreach (var view in dunge.m_netViews) // .m_prefab.GetComponent<Location>()
-                        {
-                            if (view.gameObject.activeSelf)
-                            {
-                                var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
-                                    view.gameObject.transform.position, view.gameObject.transform.rotation);
-
-                                views.Add(obj.GetComponent<ZNetView>());
-                            }
-                        }
-                        ZNetView.FinishGhostInit();*/
-
-                        //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                         pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
 
                         pkg.Write(zoneLocation.m_interiorPosition);
@@ -426,13 +393,19 @@ namespace ValhallaDumper
 
                                 //pkg.Write(loc.m_useCustomInteriorTransform);
 
-                                
+
 
                                 ///ZLog.LogWarning(dungeon.name + " " 
                                 ///    + zoneLocation.m_interiorPosition + " | " 
                                 ///    + zoneLocation.m_generatorPosition);
                                 ///
                                 ///RecurseObjectPrint(loc.m_interiorTransform.gameObject, 0);
+
+                                //var interior = loc.m_interiorTransform;
+
+                                //var tf = dungeon.transform;
+
+                                //ZLog.LogWarning(dungeon.name + " " + tf.localPosition + " " + tf.localRotation);
 
                                 //pkg.Write(zoneLocation.m_interiorPosition);
                                 //pkg.Write(zoneLocation.m_generatorPosition);
@@ -514,6 +487,7 @@ namespace ValhallaDumper
                         {
                             var room = roomData.m_room;
                             var netviews = roomData.m_netViews;
+                            var randomSpawns = roomData.m_randomSpawns;
 
                             /*
                             {
@@ -579,6 +553,9 @@ namespace ValhallaDumper
                             {
                                 view.gameObject.SetActive(true);
                             }
+
+                            // i have a suspicion that m_randomSpawns is directly tied to m_netViews
+                            // ie. RandomSpawn enables/disables specific spawned m_netView instances in Room
 
                             List<ZNetView> views = new List<ZNetView>();
                             ZNetView.StartGhostInit();

@@ -11,34 +11,19 @@ namespace ValhallaDumper
 {
     internal class DungeonDumper
     {
-        /*
-        [HarmonyPatch(typeof(DungeonDB))]
-        class DungeonDBPatch
+        [HarmonyPatch(typeof(DungeonGenerator))]
+        class DungeonGeneratorPatch
         {
             [HarmonyPostfix]
-            [HarmonyPatch(nameof(DungeonDB.Start))]
-            static void StartPostfix(ref DungeonDB __instance)
+            [HarmonyPatch(nameof(DungeonGenerator.Generate), new Type[] { typeof(int), typeof(ZoneSystem.SpawnMode) })]
+            static void GeneratePostfix(ref DungeonGenerator __instance)
             {
-                //__instance.m_rooms.
-
-                String date = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
-
-                {
-                    ZLog.Log("Dumping Dungeon Rooms");
-
-                    List<Room> prefabs = new List<Room>();
-                    foreach (var room in __instance.r)
-
-                }
-
-                {
-                    ZLog.Log("Dumping Dungeons");
-
-
-
-                }
-
+                ZLog.LogWarning("Dungeon '" + __instance.name 
+                    + "', seed: " + __instance.m_generatedSeed 
+                    + ", pos: " + __instance.transform.position 
+                    + ", rot: " + __instance.transform.rotation
+                );
             }
-        }*/
+        }
     }
 }
