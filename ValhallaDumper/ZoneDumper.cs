@@ -97,10 +97,16 @@ namespace ValhallaDumper
                     List<GameObject> prefabs = new List<GameObject>();
                     foreach (var prefab in ZNetScene.instance.m_prefabs)
                     {
-                        if (prefab.GetComponent<ZNetView>())
-                            prefabs.Add(prefab);
-                        else
-                            ZLog.LogError("Prefab missing ZNetView: " + prefab.name);
+                        if (!prefabs.Contains(prefab))
+                        {
+                            if (prefab.GetComponent<ZNetView>())
+                                prefabs.Add(prefab);
+                            else
+                                ZLog.LogError("Prefab missing ZNetView: " + prefab.name);
+                        } else
+                        {
+                            ZLog.LogError("Prefab already queued: " + prefab.name);
+                        }
                     }
 
                     var staticSolidRayMask = LayerMask.GetMask(new string[]
@@ -354,6 +360,58 @@ namespace ValhallaDumper
                     File.WriteAllBytes("./dumped/zoneLocations.pkg", pkg.GetArray());
 
                     ZLog.Log("Dumped " + locations.Count + "/" + ZoneSystem.instance.m_locations.Count + " ZoneLocations");
+                }
+
+
+
+                {
+
+                    ZLog.Log("Dumping RandomEvents");
+
+                    var events = new List<RandomEvent>();
+                    foreach (var e in RandEventSystem.instance.m_events)
+                    {
+                        if (e.m_enabled && e.m_random) {
+                            events.Add(e);
+                            ZLog.LogWarning(" - Including " + e.m_name);
+                        } else
+                            ZLog.LogWarning(" - Excluding " + e.m_name);
+                    }
+
+                    ZLog.LogWarning(" - m_eventIntervalMin: " + RandEventSystem.instance.m_eventIntervalMin);
+                    ZLog.LogWarning(" - m_eventChance: " + RandEventSystem.instance.m_eventChance);
+                    ZLog.LogWarning(" - m_randomEventRange: " + RandEventSystem.instance.m_randomEventRange);
+
+                    // Dump dungeons
+                    ZPackage pkg = new ZPackage();
+
+                    pkg.Write(comment);
+                    pkg.Write(Version.GetVersionString()); // write version for reference purposes
+                    pkg.Write(dungeons.Count);
+
+                    foreach (var e in events)
+                    {
+                        pkg.Write(e.m_name);
+                        //pkg.Write(e.m_random); // redundant?
+                        pkg.Write(e.m_duration);
+                        pkg.Write(e.m_nearBaseOnly);
+                        pkg.Write(e.m_pauseIfNoPlayerInArea);
+                        pkg.Write((int)e.m_biome);
+
+                        pkg.Write(e.m_requiredGlobalKeys.Count);
+                        foreach (var key in e.m_requiredGlobalKeys) {
+                            pkg.Write(key);
+                        }
+
+                        pkg.Write(e.m_notRequiredGlobalKeys.Count);
+                        foreach (var key in e.m_notRequiredGlobalKeys)
+                        {
+                            pkg.Write(key);
+                        }
+                    }
+
+                    File.WriteAllBytes("./dumped/randomEvents.pkg", pkg.GetArray());
+                    ZLog.Log("Dumped " + events.Count + "/" + RandEventSystem.instance.m_events.Count + " RandomEvents");
                 }
 
 
