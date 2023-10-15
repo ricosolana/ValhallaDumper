@@ -2,6 +2,7 @@
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -56,6 +57,20 @@ namespace ValhallaDumper
 
                 loaded = true;
 
+                // we all love a lack of error messages dont we?
+                //try
+                //{
+                    Dump(ref __instance);
+                //} catch (Exception e)
+                //{
+                //    ZLog.LogError("Error while dumping: ");
+                //    ZLog.LogError(e.StackTrace.ToString());
+                //    ZLog.Log("L: " + new StackTrace(e, true).GetFrame(0).GetFileLineNumber());
+                //}
+            }
+
+            static void Dump(ref ZoneSystem __instance) {
+
                 /*
                 foreach (var pair in __instance.m_locationsByHash)
                 {
@@ -88,7 +103,7 @@ namespace ValhallaDumper
 
 
 
-                String comment = String.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
+                string comment = string.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
 
                 {
                     ZLog.Log("Dumping Prefabs");
@@ -266,15 +281,19 @@ namespace ValhallaDumper
                     pkg.Write(locations.Count);
                     foreach (var loc in locations)
                     {
+                        ZLog.Log("Dumping " + loc.m_prefabName);
+
                         //var generator = loc.m_prefab.GetComponent<Location>().m_generator;
                         //if (generator)
-                            //dungeons.Add(loc.m_hash);
+                        //dungeons.Add(loc.m_hash);
 
                         //if (generator)
                         //dungeons.Add(generator.gameObject.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                         //if (loc.m_location.m_generator)
                         //dungeons.Add(loc.m_hash);
                         //dungeons.Add(loc.m_location.m_generator);
+
+                        ZLog.Log("  Basic data...");
 
                         loc.m_prefab.transform.position = Vector3.zero;
                         loc.m_prefab.transform.rotation = Quaternion.identity;
@@ -310,10 +329,32 @@ namespace ValhallaDumper
                         pkg.Write(loc.m_prioritized ? 200000 : 100000); // spawnAttempts
                         pkg.Write(loc.m_quantity);
                         pkg.Write(loc.m_randomRotation);
-                        //pkg.Write(loc.m_randomSpawns); // implement later
+
+                        pkg.Write(loc.m_randomSpawns.Count);
+                        foreach (var spawn in loc.m_randomSpawns)
+                        {
+                            pkg.Write(spawn.m_chanceToSpawn);
+
+                            pkg.Write(spawn.m_childNetViews.Count);
+                            foreach (var view in spawn.m_childNetViews)
+                            {
+                                pkg.Write(view.GetPrefabName().GetStableHashCode());
+
+                                pkg.Write(view.transform.position);
+                                pkg.Write(view.transform.rotation);
+                            }
+                            //pkg.Write((int)spawn.m_dungeonRequireTheme);
+                            //pkg.Write((int)spawn.m_requireBiome);
+                        }
+
+                        // ?
+                        //pkg.Write(69420);
+
                         pkg.Write(loc.m_slopeRotation);
                         pkg.Write(loc.m_snapToWater);
                         pkg.Write(loc.m_unique);
+
+                        ZLog.Log("  NetViews...");
 
                         // set all active like in laceLocations()
                         foreach (var view in loc.m_netViews)
@@ -347,7 +388,7 @@ namespace ValhallaDumper
                         {
                             pkg.Write(view.GetPrefabName().GetStableHashCode());
                             pkg.Write(view.m_zdo.m_position);
-                            pkg.Write(view.m_zdo.m_rotation);
+                            pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
                         }
 
                         // free (not really needed)
@@ -357,7 +398,7 @@ namespace ValhallaDumper
                         ZNetView.FinishGhostInit();
                     }
 
-                    File.WriteAllBytes("./dumped/zoneLocations.pkg", pkg.GetArray());
+                    File.WriteAllBytes("./dumped/features.pkg", pkg.GetArray());
 
                     ZLog.Log("Dumped " + locations.Count + "/" + ZoneSystem.instance.m_locations.Count + " ZoneLocations");
                 }
@@ -962,6 +1003,9 @@ namespace ValhallaDumper
 
                     ZLog.Log("Dumped " + vegetation.Count + "/" + ZoneSystem.instance.m_vegetation.Count + " ZoneVegetation");
                 }
+
+                // now dump starting keys?
+
 
 
 
