@@ -145,7 +145,7 @@ namespace ValhallaDumper
 
                         pkg.Write(view.GetPrefabName());
 
-                        pkg.Write((int)view.m_type);
+                        //pkg.Write((int)view.m_type);
 
                         //pkg.Write(view.m_syncInitialScale);
                         //if (view.m_syncInitialScale)
@@ -155,25 +155,25 @@ namespace ValhallaDumper
 
                         flags.Add(view.m_syncInitialScale);
                         flags.Add(view.m_distant);
-                        flags.Add(!view.m_persistent); // whether temporary
-
-                        //flags.Add((int)view.m_type == 1);
-                        //flags.Add((int)view.m_type - 2 == 1);
+                        flags.Add(view.m_persistent);
+                        flags.Add(((int)view.m_type & 0b01) == 1);
+                        flags.Add(((int)view.m_type & 0b10) == 1);
 
                         flags.Add(prefab.GetComponent<Piece>()              != null);
-
                         flags.Add(prefab.GetComponent<Bed>()                != null);
                         flags.Add(prefab.GetComponent<Door>()               != null);
                         flags.Add(prefab.GetComponent<Chair>()              != null);
                         flags.Add(prefab.GetComponent<Ship>()               != null);
-                        flags.Add(prefab.GetComponent<Fish>()               != null); // Fish is also ItemDrop...
+                        flags.Add(prefab.GetComponent<Fish>()               != null);   // Fish is also ItemDrop...
                         flags.Add(prefab.GetComponent<Plant>()              != null);
                         flags.Add(prefab.GetComponent<ArmorStand>()         != null);
 
+                        flags.Add(prefab.GetComponent<Projectile>()         != null);
                         flags.Add(prefab.GetComponent<ItemDrop>()           != null);
                         flags.Add(prefab.GetComponent<Pickable>()           != null);
                         flags.Add(prefab.GetComponent<PickableItem>()       != null);
 
+                        flags.Add(prefab.GetComponent<Container>()          != null);
                         flags.Add(prefab.GetComponent<CookingStation>()     != null);
                         flags.Add(prefab.GetComponent<CraftingStation>()    != null);
                         flags.Add(prefab.GetComponent<Smelter>()            != null);
@@ -181,39 +181,20 @@ namespace ValhallaDumper
 
                         flags.Add(prefab.GetComponent<WearNTear>()          != null);
                         flags.Add(prefab.GetComponent<Destructible>()       != null);
-                        //flags.Add(prefab.GetComponent<DropOnDestroyed>()    != null);
-                        //flags.Add(prefab.GetComponent<CharacterDrop>()      != null);
                         flags.Add(prefab.GetComponent<ItemStand>()          != null);
-                        //flags.Add(prefab.GetComponent<Ragdoll>()            != null);
 
                         flags.Add(prefab.GetComponent<AnimalAI>()           != null);
                         flags.Add(prefab.GetComponent<MonsterAI>()          != null);
                         flags.Add(prefab.GetComponent<Tameable>()           != null);
                         flags.Add(prefab.GetComponent<Procreation>()        != null);
 
-                        //flags.Add(prefab.GetComponent<Character>()        != null);
-                        //flags.Add(prefab.GetComponent<Humanoid>()         != null);
-                        
-                        // I still cant figure the difference between these
-                        //  only MineRock seems to be able to be hidden from view... not sure...
-                        flags.Add(prefab.GetComponent<MineRock>()           != null);
-                        flags.Add(prefab.GetComponent<MineRock5>()          != null);
-                                                
-                        //flags.Add(prefab.GetComponent<Projectile>()       != null);
-                        
-                        flags.Add(prefab.GetComponent<TreeBase>()           != null);      // natural tree
-                        flags.Add(prefab.GetComponent<TreeLog>()            != null);       // chopped down tree
+                        flags.Add(prefab.GetComponent<MineRock5>()          != null);                                                
+                        flags.Add(prefab.GetComponent<TreeBase>()           != null);   // natural tree
+                        flags.Add(prefab.GetComponent<TreeLog>()            != null);   // chopped down tree
 
-                        flags.Add(prefab.GetComponent<ZSFX>()               != null);
-                        flags.Add(prefab.GetComponent<TimedDestruction>()   != null && prefab.GetComponent<ZSFX>() == null && prefab.GetComponent<ParticleSystem>() != null);
-                        flags.Add(prefab.GetComponent<Aoe>() != null);
-
-                        flags.Add(prefab.GetComponent<DungeonGenerator>() != null);
-
-                        flags.Add(prefab.GetComponent<TerrainModifier>() != null);
-
-                        flags.Add(prefab.GetComponent<Player>() != null);
-                        flags.Add(prefab.GetComponent<TombStone>() != null);
+                        flags.Add(prefab.GetComponent<DungeonGenerator>()   != null);
+                        flags.Add(prefab.GetComponent<TerrainModifier>()    != null);
+                        flags.Add(prefab.GetComponent<CreatureSpawner>()    != null);
 
                         ulong mask = 0;
                         for (int i=0; i < flags.Count; i++)
