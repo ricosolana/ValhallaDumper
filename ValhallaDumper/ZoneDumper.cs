@@ -144,11 +144,6 @@ namespace ValhallaDumper
                             ZLog.Log("staticSolid: " + prefab.name);
 
                         pkg.Write(view.GetPrefabName());
-
-                        //pkg.Write((int)view.m_type);
-
-                        //pkg.Write(view.m_syncInitialScale);
-                        //if (view.m_syncInitialScale)
                         pkg.Write(view.gameObject.transform.localScale);
 
                         List<bool> flags = new List<bool>();
@@ -195,6 +190,7 @@ namespace ValhallaDumper
                         flags.Add(prefab.GetComponent<DungeonGenerator>()   != null);
                         flags.Add(prefab.GetComponent<TerrainModifier>()    != null);
                         flags.Add(prefab.GetComponent<CreatureSpawner>()    != null);
+                        flags.Add(prefab.GetComponent<ZSyncTransform>()     != null);
 
                         ulong mask = 0;
                         for (int i=0; i < flags.Count; i++)
