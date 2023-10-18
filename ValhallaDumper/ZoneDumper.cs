@@ -148,11 +148,13 @@ namespace ValhallaDumper
 
                         List<bool> flags = new List<bool>();
 
+                        int type = (int)view.m_type;
+
                         flags.Add(view.m_syncInitialScale);
                         flags.Add(view.m_distant);
                         flags.Add(view.m_persistent);
-                        flags.Add(((int)view.m_type & 0b01) == 1);
-                        flags.Add(((int)view.m_type & 0b10) == 1);
+                        flags.Add((type & 0b01) == 0b01);
+                        flags.Add((type & 0b10) == 0b10);
 
                         flags.Add(prefab.GetComponent<Piece>()              != null);
                         flags.Add(prefab.GetComponent<Bed>()                != null);
