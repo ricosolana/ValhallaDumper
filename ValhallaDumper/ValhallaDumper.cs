@@ -24,13 +24,15 @@ namespace ValhallaDumper
         public const string PluginName = "ValhallaDumper";
         public const string PluginVersion = "1.0.0";
 
+        public const string DUMPER_PATH = "dumped/";
+        public const string PKG_PATH = DUMPER_PATH + "pkg/";
+        public const string DOC_PATH = DUMPER_PATH + "doc/";
+
         Harmony _harmony;
 
         private void Awake()
         {
             Game.isModded = true;
-
-            Directory.CreateDirectory("./dumped");
 
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), harmonyInstanceId: PluginGUID);
 
