@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
+using Jotunn.Managers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace ValhallaDumper
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     //[NetworkCompatibility(CompatibilityLevel.ServerMustHaveMod, VersionStrictness.Minor)]
+    [BepInDependency(Jotunn.Main.ModGuid)]
     internal class ValhallaDumper : BaseUnityPlugin
     {
         // BepInEx' plugin metadata
@@ -35,6 +37,8 @@ namespace ValhallaDumper
             Game.isModded = true;
 
             _harmony = Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), harmonyInstanceId: PluginGUID);
+
+            CommandManager.Instance.AddConsoleCommand(new AvlDumpCommand());
 
             ZLog.Log("Loading ValhallaDumper");
         }
