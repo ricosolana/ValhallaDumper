@@ -534,13 +534,15 @@ namespace ValhallaDumper
 
                     LogInfo(" - " + zoneLocation.m_name + " (" + prefab.name + ")");
 
-                    var loc = prefab.GetComponent<Location>();
-                    var dungeon = prefab.GetComponent<DungeonGenerator>();
+                    var loc = prefab.GetComponent<Location>()!;
+                    var dungeon = prefab.GetComponent<DungeonGenerator>()!;
+                    var name = prefab.name ?? Utils.GetPrefabName(prefab);
                     //var dungeon = pair
                     //.Value
                     //.Value;
 
-                    pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
+                    //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
+                    pkg.Write(name);
                     pkg.Write(loc.m_interiorTransform
                         .localPosition); // m_interiorPosition);
                     pkg.Write(loc.m_generator.transform
@@ -617,7 +619,8 @@ namespace ValhallaDumper
                     pkg.Write(dungeon.m_doorTypes.Count);
                     foreach (var door in dungeon.m_doorTypes)
                     {
-                        pkg.Write(door.m_prefab.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
+                        var doorPrefab = door.m_prefab;
+                        pkg.Write(doorPrefab.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                         pkg.Write(door.m_connectionType);
                         pkg.Write(door.m_chance);
                     }
