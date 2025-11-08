@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace ValhallaDumper
 {
@@ -19,15 +20,21 @@ namespace ValhallaDumper
 
             if (args.Length == 0)
             {
-                Chat.print("This will lagg your game a lot during dumping");
-                Chat.print("Dumping will also destroy the current world.");
-                Chat.print("USE WITH CAUTION!");
+                //Chat.print("This will lagg your game a lot during dumping");
+                //Chat.print("Dumping will also destroy the current world.");
+                //Chat.print("USE WITH CAUTION!");
+                //
+                //Chat.print("run this command again with 'confirm'");
 
-                Chat.print("run this command again with 'confirm'");
+                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Run with /avl_dump confirm");
                 return;
             }
 
-            Chat.print("Dumping...");
+            //Cursor.lockState = CursorLockMode.None;
+
+            //Chat.print("Dumping...");
+
+            MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Dumping... (Will take a few seconds)");
 
             Dumper.DumpDocs();
             Dumper.DumpPackages();

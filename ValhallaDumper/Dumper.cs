@@ -1,12 +1,13 @@
-﻿using System;
+﻿using BepInEx;
+using HarmonyLib;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using BepInEx;
-using HarmonyLib;
 using UnityEngine;
 using UnityEngine.XR;
 using static MonoMod.InlineRT.MonoModRule;
@@ -512,7 +513,8 @@ namespace ValhallaDumper
                 LogInfo("Dumped " + events.Count + "/" + RandEventSystem.instance.m_events.Count + " RandomEvents");
             }
 
-
+            // To disable saving this broken world
+            ZoneSystem.instance.m_didZoneTest = true;
 
             {
                 LogInfo("Dumping " + dungeons.Count + " Dungeons");
@@ -529,28 +531,52 @@ namespace ValhallaDumper
 
                     var zoneLocation = pair.Value.Key;
 
-                    zoneLocation.m_prefab.Load();
-                    var prefab = zoneLocation.m_prefab.Asset;
+                    var prefab = zoneLocation.m_prefab;
+                    prefab.Load();
+                    ZNetView[] enabledComponentsInChildren = Utils.GetEnabledComponentsInChildren<ZNetView>(prefab.Asset);
+                    RandomSpawn[] enabledComponentsInChildren2 = Utils.GetEnabledComponentsInChildren<RandomSpawn>(prefab.Asset);
 
-                    LogInfo(" - " + zoneLocation.m_name + " (" + prefab.name + ")");
+                    for (int i = 0; i < enabledComponentsInChildren2.Length; i++)
+                    {
+                        enabledComponentsInChildren2[i].Prepare();
+                    }
 
-                    var loc = prefab.GetComponent<Location>()!;
-                    var dungeon = prefab.GetComponent<DungeonGenerator>()!;
-                    var name = prefab.name ?? Utils.GetPrefabName(prefab);
+                    LogInfo(" - " + zoneLocation.m_name + " (" + prefab.Asset.name + ")");
+
+                    var loc = prefab.Asset.GetComponent<Location>()!;
+
+                    //var dungeon = prefab.Asset.GetComponent<DungeonGenerator>()!;
+                    var dungeon = pair.Value.Value!; // we use the instanced generator, not the template one
+                    var name = prefab.Asset.name ?? Utils.GetPrefabName(prefab.Asset);
                     //var dungeon = pair
                     //.Value
                     //.Value;
 
+                    //{
+                    //
+                    //
+                    //    Vector3 vector = Vector3.zero;
+                    //    Vector3 vector2 = Vector3.zero;
+                    //    if (loc.m_interiorTransform)
+                    //    {
+                    //        vector = loc.m_interiorTransform.localPosition;
+                    //        vector2 = loc.m_generator.transform.localPosition;
+                    //        pkg.Write(vector);
+                    //        pkg.Write()
+                    //    }
+                    //}
+
                     //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
                     pkg.Write(name);
-                    pkg.Write(loc.m_interiorTransform
-                        .localPosition); // m_interiorPosition);
-                    pkg.Write(loc.m_generator.transform
-                        .localPosition); // zoneLocation.m_generatorPosition);
+                    //pkg.Write(loc.m_interiorTransform
+                    //    ?.localPosition ?? Vector3.zero); // m_interiorPosition);
+                    //pkg.Write(loc.m_generator.transform
+                    //    .localPosition); // zoneLocation.m_generatorPosition);
 
-                    if (loc.m_useCustomInteriorTransform)
-                    {
-                        //pkg.Write(loc.m_useCustomInteriorTransform);
+                    bool useTransform = loc.m_useCustomInteriorTransform && loc.m_interiorTransform && loc.m_generator;
+                    pkg.Write(useTransform);
+                    if (useTransform)
+                    {                        
                         //if (loc.m_interiorTransform && loc.m_generator)
                         {
                             //bool anyNull = zoneLocation.m_interiorPosition == null
@@ -575,7 +601,9 @@ namespace ValhallaDumper
 
                             //LogWarning(dungeon.name + " " + tf.localPosition + " " + tf.localRotation);
 
-                            //pkg.Write(zoneLocation.m_interiorPosition);
+                            pkg.Write(loc.m_interiorTransform.localPosition);
+                            pkg.Write(loc.m_interiorTransform.localRotation);
+                            pkg.Write(loc.m_generator.transform.localPosition);
                             //pkg.Write(zoneLocation.m_generatorPosition);
 
                             //bool anyEmpty = zoneLocation.m_interiorPosition == null || zoneLocation.m_generatorPosition == null
@@ -607,8 +635,6 @@ namespace ValhallaDumper
                             //catch (Exception e) { }
                         }
                     }
-
-
 
                     pkg.Write((int)dungeon.m_algorithm);
                     pkg.Write(dungeon.m_alternativeFunctionality);
@@ -759,7 +785,8 @@ namespace ValhallaDumper
 
                                 if (randomSpawn.transform.childCount != 0)
                                 {
-                                    LogWarning("Unexpected children (but expected apparently): " + randomSpawn.transform.parent.gameObject.name);
+                                    // This WILL print (I hate unity
+                                    //LogWarning("Unexpected children (but expected apparently): " + randomSpawn.transform.parent.gameObject.name);
                                 }
                             }
 
@@ -902,6 +929,14 @@ namespace ValhallaDumper
                         pkg.Write(room.m_weight);
                         pkg.Write(room.transform.position);
                         pkg.Write(room.transform.rotation);
+
+
+                    }
+
+                    // everything is disgustingly manual in this game... ugh...
+                    foreach (var c in enabledComponentsInChildren2)
+                    {
+                        c.Reset();
                     }
                 }
 
