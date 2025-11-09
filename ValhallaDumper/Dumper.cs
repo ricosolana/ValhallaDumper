@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.XR;
 using static MonoMod.InlineRT.MonoModRule;
+using static UnityEngine.InputSystem.Layouts.InputControlLayout;
 
 namespace ValhallaDumper
 {
@@ -41,7 +42,13 @@ namespace ValhallaDumper
             Directory.CreateDirectory(ValhallaDumper.DOC_PATH);
 
             {
-                // first prefabs
+                /* * * * * * * * * * * * * * * * * * * * * 
+                 * 
+                 *
+                 *      PREFAB DOCUMENTATION DUMPING
+                 * 
+                 * 
+                 * * * * * * * * * * * * * * * * * * * * */
 
                 StringBuilder builder = new StringBuilder();
 
@@ -83,6 +90,32 @@ namespace ValhallaDumper
                 }
 
                 File.WriteAllText(ValhallaDumper.DOC_PATH + "prefabs.csv", builder.ToString());
+            }
+
+            {
+                /* * * * * * * * * * * * * * * * * * * * * 
+                 * 
+                 *
+                 *      VERSION DOCUMENTATION DUMPING
+                 * 
+                 * 
+                 * * * * * * * * * * * * * * * * * * * * */
+
+                StringBuilder builder = new StringBuilder();
+
+                builder.Append("Documentation automatically generated from Valheim ").Append(Version.GetVersionString())
+                    .AppendLine(",,");
+
+                builder.Append("Current version,").Append(Version.CurrentVersion.ToString()).AppendLine();
+                builder.Append("Network version,").Append(Version.m_networkVersion).AppendLine();
+                builder.Append("World version,").Append(Version.m_worldVersion).AppendLine();
+                builder.Append("Worldgen version,").Append(Version.m_worldGenVersion).AppendLine();
+                builder.Append("Location version,").Append(ZoneSystem.instance.m_locationVersion).AppendLine();
+                builder.Append("Player version,").Append(Version.m_playerVersion).AppendLine();
+                builder.Append("Player data version,").Append(Version.m_playerDataVersion).AppendLine();
+                builder.Append("Item data version,").Append(Version.m_itemDataVersion).AppendLine();
+
+                File.WriteAllText(ValhallaDumper.DOC_PATH + "version.csv", builder.ToString());
             }
 
             {
