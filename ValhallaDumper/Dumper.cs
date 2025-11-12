@@ -19,21 +19,24 @@ namespace ValhallaDumper
     {
         static void LogInfo(object message)
         {
-            var fmt = $"<color=#AA2266>[AVL]</color><color=#777777>{message}</color>";
+            //var fmt = $"<color=#AA2266>[AVL]</color><color=#777777>{message}</color>";
+            var fmt = "[AVL-info]" + message;
             ZLog.Log(fmt);
-            Chat.print(fmt);
+            //Chat.print(fmt);
         }
 
         static void LogWarning(object message) {
-            var fmt = $"<color=#AA2266>[AVL]</color><color=#CC2222>{message}</color>";
+            //var fmt = $"<color=#AA2266>[AVL]</color><color=#CC2222>{message}</color>";
+            var fmt = "[AVL-warn]" + message;
             ZLog.Log(fmt);
-            Chat.print(fmt);
+            //Chat.print(fmt);
         }
 
         static void LogError(object message) {
-            var fmt = $"<color=#AA2266>[AVL]</color><color=#AA0000>{message}</color>";
+            //var fmt = $"<color=#AA2266>[AVL]</color><color=#AA0000>{message}</color>";
+            var fmt = "[AVL-erro]" + message;
             ZLog.Log(fmt);
-            Chat.print(fmt);
+            //Chat.print(fmt);
         }
 
         public static void DumpDocs()
@@ -52,7 +55,7 @@ namespace ValhallaDumper
 
                 StringBuilder builder = new StringBuilder();
 
-                builder.Append("Documentation automatically generated from Valheim ").Append(Version.GetVersionString())
+                builder.Append("Documentation automatically generated from Valheim ").Append(Version.CurrentVersion.ToString())
                     .AppendLine(",,");
                 foreach (var pair in ZNetScene.instance.m_namedPrefabs)
                 {
@@ -103,7 +106,7 @@ namespace ValhallaDumper
 
                 StringBuilder builder = new StringBuilder();
 
-                builder.Append("Documentation automatically generated from Valheim ").Append(Version.GetVersionString())
+                builder.Append("Documentation automatically generated from Valheim ").Append(Version.CurrentVersion.ToString())
                     .AppendLine(",,");
 
                 builder.Append("Current version,").Append(Version.CurrentVersion.ToString()).AppendLine();
@@ -165,7 +168,9 @@ namespace ValhallaDumper
                 // Prepare prefabs
                 List<GameObject> prefabs = new List<GameObject>();
                 foreach (var prefab in ZNetScene.instance.m_prefabs)
+                //foreach (var pair in ZNetScene.instance.m_namedPrefabs)
                 {
+                    //var prefab = pair.Value;
                     if (!prefabs.Contains(prefab))
                     {
                         if (prefab.GetComponent<ZNetView>())
@@ -195,7 +200,7 @@ namespace ValhallaDumper
                 ZPackage pkg = new ZPackage();
 
                 pkg.Write(comment);
-                pkg.Write(Version.GetVersionString()); // write version for reference purposes
+                pkg.Write(Version.CurrentVersion.ToString()); // write version for reference purposes
                 pkg.Write(prefabs.Count);
                 foreach (var prefab in prefabs)
                 {
@@ -301,23 +306,20 @@ namespace ValhallaDumper
                     {
                         if (loc.m_quantity > 0)
                         {
-                            if (loc.m_prefab.IsValid)
-                            {
-                                // prepare
-                                //var zviews = Utils.GetEnabledComponentsInChildren<ZNetView>(loc.m_prefab.Asset);
-                                loc.m_prefab.Load();
+                            // prepare
+                            //var zviews = Utils.GetEnabledComponentsInChildren<ZNetView>(loc.m_prefab.Asset);
+                            //loc.m_prefab.Load();
 
-                                //var obj = loc.m_prefab?.Asset.name ?? null;
-                                if (loc.m_prefabName
-                                    != loc.m_prefab.Asset.name)
-                                {
-                                    LogWarning("ZoneLocation unequal names: " + loc.m_prefabName + ", " + loc.m_prefab.Asset.name);
-                                }
+                            //var obj = loc.m_prefab?.Asset.name ?? null;
+                            //if (loc.m_prefabName
+                            //    != loc.m_prefab.Asset.name)
+                            //{
+                            //    LogWarning("ZoneLocation unequal names: " + loc.m_prefabName + ", " + loc.m_prefab.Asset.name);
+                            //}
 
-                                locations.Add(loc);
-                            }
-                            else
-                                LogError("ZoneLocation missing prefab: " + loc.m_prefabName);
+                            loc.m_prefab.Load();
+
+                            locations.Add(loc);
                         }
                         else
                             LogError("ZoneLocation bad m_quantity: " + loc.m_prefabName + " " + loc.m_quantity);
@@ -332,7 +334,7 @@ namespace ValhallaDumper
                 ZPackage pkg = new ZPackage();
 
                 pkg.Write(comment);
-                pkg.Write(Version.GetVersionString()); // write version for reference purposes
+                pkg.Write(Version.CurrentVersion.ToString()); // write version for reference purposes
                 pkg.Write(locations.Count);
                 foreach (var zloc in locations)
                 {
@@ -440,48 +442,71 @@ namespace ValhallaDumper
                     LogInfo("  NetViews...");
 
                     // set all active like in laceLocations()
-                    var netViews = zloc.m_prefab.Asset.GetComponentsInChildren<ZNetView>();
-                    foreach (var view in netViews)
-                    {
-                        view.gameObject.SetActive(true);
-                    }
+                    var netViews = Utils.GetEnabledComponentsInChildren<ZNetView>(zloc.m_prefab.Asset);
+                    //var netViews = zloc.m_prefab.Asset.GetComponentsInChildren<ZNetView>();
+                    //foreach (var view in netViews)
+                    //{
+                    //    view.gameObject.SetActive(true);
+                    //}
 
                     List<ZNetView> views = new List<ZNetView>();
-                    ZNetView.StartGhostInit();
+                    //ZNetView.StartGhostInit();
                     foreach (var view in netViews) // .m_prefab.GetComponent<Location>()
                     {
                         if (view.gameObject.activeSelf)
                         {
-                            var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
-                                view.gameObject.transform.position, view.gameObject.transform.rotation);
+                            ////ZNetView.StartGhostInit();
 
-                            ZNetView nv = obj.GetComponent<ZNetView>();
-                            views.Add(nv);
+                            // nothing needs to be instantiated
 
-                            int hash = nv.GetPrefabName().GetStableHashCode();
+                            //var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
+                            //view.gameObject.transform.position, view.gameObject.transform.rotation);
 
-                            var dungeon = obj.GetComponent<DungeonGenerator>();
+                            views.Add(view);
+
+                            int hash = view.GetPrefabName().GetStableHashCode();
+
+                            var dungeon = view.gameObject.GetComponent<DungeonGenerator>();
                             if (dungeon && !dungeons.ContainsKey(hash))
                             {
+                                // name should be normal and within prefabs
                                 dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(zloc, dungeon);
-                                //dungeons.Add(obj.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
                             }
+
+                            //ZNetView nv = obj.GetComponent<ZNetView>();
+                            //views.Add(nv);
+                            //
+                            //var dungeon = obj.GetComponent<DungeonGenerator>();
+                            //if (dungeon && !dungeons.ContainsKey(hash))
+                            //{
+                            //    dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(zloc, dungeon);
+                            //    //dungeons.Add(obj.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
+                            //}
+
+                            ////ZNetView.FinishGhostInit();
                         }
                     }
 
                     pkg.Write(views.Count);
                     foreach (var view in views)
                     {
-                        pkg.Write(view.GetPrefabName().GetStableHashCode());
-                        pkg.Write(view.m_zdo.m_position);
-                        pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
+                        //pkg.Write(view.GetPrefabName().GetStableHashCode());
+                        pkg.Write(Utils.GetPrefabName(view.gameObject).GetStableHashCode());
+                        //pkg.Write(view.m_zdo.m_position);
+                        pkg.Write(view.gameObject.transform.position);
+                        //pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
+                        pkg.Write(view.gameObject.transform.rotation);
+
+                        ////pkg.Write(view.GetPrefabName().GetStableHashCode());
+                        ////pkg.Write(view.m_zdo.m_position);
+                        ////pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
                     }
 
                     // free (not really needed)
                     //foreach (var view in views)
                     //UnityEngine.GameObject.Destroy(view.gameObject);
 
-                    ZNetView.FinishGhostInit();
+                    
                 }
 
                 File.WriteAllBytes(ValhallaDumper.PKG_PATH + "features.pkg", pkg.GetArray());
@@ -517,8 +542,8 @@ namespace ValhallaDumper
                 ZPackage pkg = new ZPackage();
 
                 pkg.Write(comment);
-                pkg.Write(Version.GetVersionString()); // write version for reference purposes
-                pkg.Write(dungeons.Count);
+                pkg.Write(Version.CurrentVersion.ToString()); // write version for reference purposes
+                pkg.Write(events.Count);
 
                 foreach (var e in events)
                 {
@@ -546,6 +571,8 @@ namespace ValhallaDumper
                 LogInfo("Dumped " + events.Count + "/" + RandEventSystem.instance.m_events.Count + " RandomEvents");
             }
 
+
+
             // To disable saving this broken world
             ZoneSystem.instance.m_didZoneTest = true;
 
@@ -556,7 +583,7 @@ namespace ValhallaDumper
                 ZPackage pkg = new ZPackage();
 
                 pkg.Write(comment);
-                pkg.Write(Version.GetVersionString()); // write version for reference purposes
+                pkg.Write(Version.CurrentVersion.ToString()); // write version for reference purposes
                 pkg.Write(dungeons.Count);
                 foreach (var pair in dungeons)
                 {
@@ -574,13 +601,18 @@ namespace ValhallaDumper
                         enabledComponentsInChildren2[i].Prepare();
                     }
 
-                    LogInfo(" - " + zoneLocation.m_name + " (" + prefab.Asset.name + ")");
+                    //LogInfo(" - " + zoneLocation.m_name + " (" + prefab.Asset.name + ") - Prefab: " + ZNetScene.instance.m_namedPrefabs.ContainsKey(prefab.Name.GetStableHashCode()) + " (" + prefab.Name + ")");
 
                     var loc = prefab.Asset.GetComponent<Location>()!;
 
                     //var dungeon = prefab.Asset.GetComponent<DungeonGenerator>()!;
                     var dungeon = pair.Value.Value!; // we use the instanced generator, not the template one
-                    var name = prefab.Asset.name ?? Utils.GetPrefabName(prefab.Asset);
+                    //var name = prefab.Asset.name ?? Utils.GetPrefabName(prefab.Asset);
+                    //var name = Utils.GetPrefabName(prefab.Asset)!;
+                    var name = dungeon.name;
+
+                    LogInfo(" - loc: " + prefab.Asset.name + ", pfb/dngn: " + ZNetScene.instance.m_namedPrefabs.ContainsKey(name.GetStableHashCode()) + " / " + name);
+
                     //var dungeon = pair
                     //.Value
                     //.Value;
@@ -995,15 +1027,15 @@ namespace ValhallaDumper
                         if (veg.m_prefab && veg.m_prefab.GetComponent<ZNetView>())
                         {
                             vegetation.Add(veg);
-                            LogInfo("Querying " + veg.m_prefab.name);
+                            LogInfo("Queing: " + veg.m_prefab.name);
                         }
                         else {
-                            LogError("Failed to query ZoneVegetation: " + veg.m_prefab.name);
+                            LogError("Fail queuing: " + veg.m_prefab.name);
                         }
                     }
                     else
                     {
-                        LogWarning("Skipping query of " + veg.m_prefab.name);
+                        LogWarning("Skipping queing: " + veg.m_prefab.name);
 
                         // Most conflict anyways because lazy
                         //if (veg.m_name != veg.m_prefab.name)
@@ -1115,7 +1147,7 @@ namespace ValhallaDumper
 
 
                 pkg.Write(comment);
-                pkg.Write(Version.GetVersionString());
+                pkg.Write(Version.CurrentVersion.ToString());
                 pkg.Write(vegetation.Count);
                 foreach (var veg in vegetation)
                 {
