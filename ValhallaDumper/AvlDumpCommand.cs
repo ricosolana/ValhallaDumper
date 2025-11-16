@@ -30,14 +30,33 @@ namespace ValhallaDumper
                 return;
             }
 
-            //Cursor.lockState = CursorLockMode.None;
+            try
+            {
+                Dumper.DumpDocs();
+                Dumper.DumpPackages();
 
-            //Chat.print("Dumping...");
-
-            MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Dumping... (Will take a few seconds)");
-
-            Dumper.DumpDocs();
-            Dumper.DumpPackages();
+                //MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Run with /avl_dump confirm");
+                //Chat.print("Dumping success");
+                ZRoutedRpc.instance.InvokeRoutedRPC(ZDOMan.instance.m_sessionID, "ChatMessage", new object[]
+                {
+                        Player.m_localPlayer.GetHeadPoint(),
+                        (int)Talker.Type.Normal,
+                        UserInfo.GetLocalUser(),
+                        "Dumping success"
+                });
+            }
+            catch (Exception ex)
+            {
+                //Chat.print("Dumping exception, see console");
+                ZRoutedRpc.instance.InvokeRoutedRPC(ZDOMan.instance.m_sessionID, "ChatMessage", new object[]
+                {
+                        Player.m_localPlayer.GetHeadPoint(),
+                        (int)Talker.Type.Normal,
+                        UserInfo.GetLocalUser(),
+                        "Dumping failed; see logs"
+                });
+                throw new Exception("Exception: ", ex);
+            }
         }
     }
 }

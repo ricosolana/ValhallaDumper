@@ -137,6 +137,11 @@ namespace ValhallaDumper
              *
              **/
 
+            if (netViews.Length > 0xFFFF)
+            {
+                throw new Exception("netviews limited to 65535; change this limit otherwise");
+            }
+
             pkg.Write(randomSpawns.Length);
             foreach (var spawn in randomSpawns)
             {
@@ -151,7 +156,7 @@ namespace ValhallaDumper
                 pkg.Write((int)(spawn.m_dungeonRequireTheme));
 
                 // biome
-                pkg.Write((int)(spawn.m_requireBiome));
+                pkg.Write((ushort)(spawn.m_requireBiome));
 
                 // lava?
                 pkg.Write(spawn.m_notInLava);
@@ -179,10 +184,15 @@ namespace ValhallaDumper
                         LogError("Cant find child index: " + childView.GetPrefabName());
                         throw new Exception("unable to find matching child in netview table for given randomspawn");
                     }
-                    pkg.Write(childIndex);
+
+                    if (childIndex > 0xFFFF)
+                    {
+                        // actually unexpected, this should NEVER print, assuming the above netview count check was truly successful
+                        throw new Exception("UNEXPECTED, must not be larger than 65535");
+                    }
+
+                    pkg.Write((ushort) childIndex);
                 }
-
-
 
                 spawn.Reset();
             }
@@ -432,6 +442,9 @@ namespace ValhallaDumper
                     pkg.Write(zloc.m_prioritized ? 200000 : 100000); // spawnAttempts
                     pkg.Write(zloc.m_quantity);
                     pkg.Write(zloc.m_randomRotation);
+                    pkg.Write(zloc.m_slopeRotation);
+                    pkg.Write(zloc.m_snapToWater);
+                    pkg.Write(zloc.m_unique);
 
 
 
@@ -466,7 +479,7 @@ namespace ValhallaDumper
                     {
                         var viewName = Utils.GetPrefabName(view.gameObject);
 
-                        pkg.Write(viewName); //Name included for Debugging
+                        pkg.Write(viewName); //debug
                         pkg.Write(viewName.GetStableHashCode());
                         pkg.Write(view.gameObject.transform.position);
                         pkg.Write(view.gameObject.transform.rotation);
@@ -482,11 +495,7 @@ namespace ValhallaDumper
 
                     var randomSpawns = zloc.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
                     WriteRandomSpawns(netViews, randomSpawns, ref pkg);
-
-                    pkg.Write(zloc.m_slopeRotation);
-                    pkg.Write(zloc.m_snapToWater);
-                    pkg.Write(zloc.m_unique);
-
+                    
                     LogInfo("  NetViews...");
                 }
 
@@ -678,6 +687,11 @@ namespace ValhallaDumper
                         pkg.Write(room.m_minPlaceOrder);
                         //pkg.Write(room.m_musicPrefab)
                         pkg.Write(room.m_perimeter);
+                        pkg.Write(room.m_size);
+                        pkg.Write((int)room.m_theme);
+                        pkg.Write(room.m_weight);
+                        pkg.Write(room.transform.position);
+                        pkg.Write(room.transform.rotation);
 
                         var connections = room.GetConnections();
                         pkg.Write(connections.Length);
@@ -711,14 +725,8 @@ namespace ValhallaDumper
                         }
 
                         // Dump RandomSpawns
-                        var randomSpawns = global::Utils.GetEnabledComponentsInChildren<RandomSpawn>(roomData.m_prefab.Asset);
+                        var randomSpawns = Utils.GetEnabledComponentsInChildren<RandomSpawn>(roomData.m_prefab.Asset);
                         WriteRandomSpawns(netViews, randomSpawns, ref pkg);
-
-                        pkg.Write(room.m_size);
-                        pkg.Write((int)room.m_theme);
-                        pkg.Write(room.m_weight);
-                        pkg.Write(room.transform.position);
-                        pkg.Write(room.transform.rotation);
                     }
 
                 }
@@ -915,7 +923,7 @@ namespace ValhallaDumper
                             LogWarning("Vegetation missing defined radius: " + prefabName + " (is this a new version?)");
                         }
 
-                        LogWarning("Dumping vegetation block layer " + prefabName + ", radius: " + radius);
+                        LogWarning("Dumping vegetation " + prefabName + ", radius: " + radius);
 
                         pkg.Write(radius);
 
