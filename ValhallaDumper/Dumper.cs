@@ -20,21 +20,21 @@ namespace ValhallaDumper
         static void LogInfo(object message)
         {
             //var fmt = $"<color=#AA2266>[AVL]</color><color=#777777>{message}</color>";
-            var fmt = "[AVL-info]" + message;
+            var fmt = "[AVL-info] " + message;
             ZLog.Log(fmt);
             //Chat.print(fmt);
         }
 
         static void LogWarning(object message) {
             //var fmt = $"<color=#AA2266>[AVL]</color><color=#CC2222>{message}</color>";
-            var fmt = "[AVL-warn]" + message;
+            var fmt = "[AVL-warn] " + message;
             ZLog.Log(fmt);
             //Chat.print(fmt);
         }
 
         static void LogError(object message) {
             //var fmt = $"<color=#AA2266>[AVL]</color><color=#AA0000>{message}</color>";
-            var fmt = "[AVL-erro]" + message;
+            var fmt = "[AVL-erro] " + message;
             ZLog.Log(fmt);
             //Chat.print(fmt);
         }
@@ -128,6 +128,66 @@ namespace ValhallaDumper
 
         }
 
+        //private static void WriteViewsAndSpawns(List<ZNetView> netViews, List<RandomSpawn> randomSpawns, bool isDungeon, ref ZPackage pkg)
+        private static void WriteRandomSpawns(ZNetView[] netViews, RandomSpawn[] randomSpawns, ref ZPackage pkg)
+        {
+            /*
+             *
+             *  RandomSpawn correspondence with Views
+             *
+             **/
+
+            pkg.Write(randomSpawns.Length);
+            foreach (var spawn in randomSpawns)
+            {
+                spawn.Prepare();
+
+
+
+                // chance
+                pkg.Write(spawn.m_chanceToSpawn);
+
+                // theme
+                pkg.Write((int)(spawn.m_dungeonRequireTheme));
+
+                // biome
+                pkg.Write((int)(spawn.m_requireBiome));
+
+                // lava?
+                pkg.Write(spawn.m_notInLava);
+
+                // elevation min
+                pkg.Write(spawn.m_minElevation);
+
+                // elevation max
+                pkg.Write(spawn.m_maxElevation);
+
+                // Perform a FIND() against ALL child and ALL netviews
+
+                var childViews = spawn.m_childNetViews;
+
+                pkg.Write(childViews.Count);
+
+                foreach (var childView in spawn.m_childNetViews)
+                {
+                    // Find the child within ALL views
+                    var childIndex = Array.IndexOf(netViews, childView);
+                    if (childIndex == -1)
+                    {
+                        LogError("if you are seeing this message, THIS IS BROKEN!");
+
+                        LogError("Cant find child index: " + childView.GetPrefabName());
+                        throw new Exception("unable to find matching child in netview table for given randomspawn");
+                    }
+                    pkg.Write(childIndex);
+                }
+
+
+
+                spawn.Reset();
+            }
+        }
+
         public static void DumpPackages()
         {
             /*
@@ -160,11 +220,18 @@ namespace ValhallaDumper
                 }
             }*/
 
+            LogInfo("Starting game data dump...");
+            LogInfo("This might take a few minutes depending on hardware!");
+
             Directory.CreateDirectory(ValhallaDumper.PKG_PATH);
 
             string comment = string.Format("{0:MM/dd/yyyy hh:mm.ss}", DateTime.Now);
 
             {
+                LogInfo("------------------- Dumping Prefabs -------------------");
+
+                int idx = 0;
+
                 // Prepare prefabs
                 List<GameObject> prefabs = new List<GameObject>();
                 foreach (var prefab in ZNetScene.instance.m_prefabs)
@@ -175,20 +242,21 @@ namespace ValhallaDumper
                     {
                         if (prefab.GetComponent<ZNetView>())
                         {
+                            LogInfo("+fab " + prefab.name + " (" + idx + ")");
                             prefabs.Add(prefab);
                         }
                         else
                         {
-                            LogError("Prefab missing ZNetView: " + prefab.name);
+                            LogError("-fab " + prefab.name + " (no nview, " + idx + ")");
                         }
                     }
                     else
                     {
-                        LogError("Duplicate prefab registered: " + prefab.name);
+                        LogError("-fab " + prefab.name + " (dup, " + idx + ")");
                     }
-                }
 
-                LogInfo("Dumping " + prefabs.Count + " Prefabs");
+                    idx++;
+                }
 
                 var staticSolidRayMask = LayerMask.GetMask(new string[]
                 {
@@ -206,10 +274,13 @@ namespace ValhallaDumper
                 {
                     var view = prefab.GetComponent<ZNetView>();
 
+                    var prefabName = view.GetPrefabName();
+
                     //if ((prefab.layer & staticSolidRayMask) > 0)
                         //LogWarning("staticSolid: " + prefab.name);
 
-                    pkg.Write(view.GetPrefabName());
+                    pkg.Write(prefabName); // Required
+                    pkg.Write(prefabName.GetStableHashCode()); // Optional for debug
                     pkg.Write(view.gameObject.transform.localScale);
 
                     List<bool> flags = new List<bool>();
@@ -274,7 +345,6 @@ namespace ValhallaDumper
 
                 var message = "Dumped " + prefabs.Count + "/" + ZNetScene.instance.m_prefabs.Count + " prefabs";
                 LogWarning(message);
-                Chat.print(message);
             }
 
 
@@ -288,12 +358,9 @@ namespace ValhallaDumper
                 = new Dictionary<int, KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>>();
 
             {
-                LogInfo("Dumping ZoneLocations");
+                LogInfo("------------------- Dumping ZoneLocations -------------------");
 
-                // apparently called already...
-                //__instance.SetupLocations();
-
-
+                int idx = 0;
 
                 // Prepare locations
                 List<ZoneSystem.ZoneLocation> locations = new List<ZoneSystem.ZoneLocation>();
@@ -306,26 +373,21 @@ namespace ValhallaDumper
                     {
                         if (loc.m_quantity > 0)
                         {
-                            // prepare
-                            //var zviews = Utils.GetEnabledComponentsInChildren<ZNetView>(loc.m_prefab.Asset);
-                            //loc.m_prefab.Load();
-
-                            //var obj = loc.m_prefab?.Asset.name ?? null;
-                            //if (loc.m_prefabName
-                            //    != loc.m_prefab.Asset.name)
-                            //{
-                            //    LogWarning("ZoneLocation unequal names: " + loc.m_prefabName + ", " + loc.m_prefab.Asset.name);
-                            //}
+                            LogInfo("+loc " + loc.m_prefabName + " (" + idx + ")");
 
                             loc.m_prefab.Load();
 
                             locations.Add(loc);
                         }
-                        else
-                            LogError("ZoneLocation bad m_quantity: " + loc.m_prefabName + " " + loc.m_quantity);
+                        else {
+                            LogWarning("-loc " + loc.m_prefabName + " (0qty, " + idx + ")");
+                        }
                     }
-                    else
-                        LogWarning("Skipping dump of " + loc.m_prefabName);
+                    else {
+                        LogInfo("-loc " + loc.m_prefabName + " (disabled, " + idx + ")");
+                    }
+
+                    idx++;
                 }
 
 
@@ -338,30 +400,12 @@ namespace ValhallaDumper
                 pkg.Write(locations.Count);
                 foreach (var zloc in locations)
                 {
-                    LogInfo("Dumping " + zloc.m_prefabName);
-
-                    //var generator = loc.m_prefab.GetComponent<Location>().m_generator;
-                    //if (generator)
-                    //dungeons.Add(loc.m_hash);
-
-                    //if (generator)
-                    //dungeons.Add(generator.gameObject.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
-                    //if (loc.m_location.m_generator)
-                    //dungeons.Add(loc.m_hash);
-                    //dungeons.Add(loc.m_location.m_generator);
-
-                    LogInfo("  Basic data...");
-
                     zloc.m_prefab.Asset.transform.position = Vector3.zero;
                     zloc.m_prefab.Asset.transform.rotation = Quaternion.identity;
-                    //if (loc.m_prefab.transform.localScale != ZNetScene.instance.)
 
                     var loc = zloc.m_prefab.Asset.GetComponent<Location>();
 
                     pkg.Write(zloc.m_prefabName);
-                    //pkg.Write(loc.m_location.m_generator != null);
-                    //pkg.Write(loc.m_location.m_generator ? loc.m_location.m_generator.gameObject.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode() : 0);
-                    ///pkg.Write(loc.m_prefab.name);       // m_prefab appears to be null
                     pkg.Write((int)zloc.m_biome);
                     pkg.Write((int)zloc.m_biomeArea);
                     pkg.Write(loc.m_applyRandomDamage);
@@ -389,124 +433,61 @@ namespace ValhallaDumper
                     pkg.Write(zloc.m_quantity);
                     pkg.Write(zloc.m_randomRotation);
 
-                    var randomSpawns = zloc.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
 
-                    pkg.Write(randomSpawns.Length);
-                    foreach (var spawn in randomSpawns)
+
+                    /*
+                     * 
+                     * Gather dungeon names for later easy access
+                     * 
+                     **/
+                    var netViews = Utils.GetEnabledComponentsInChildren<ZNetView>(zloc.m_prefab.Asset);
+                    
+                    foreach (var view in netViews)
                     {
-                        spawn.Prepare();
+                        int hash = view.GetPrefabName().GetStableHashCode();
 
-
-
-                        // chance
-                        pkg.Write(spawn.m_chanceToSpawn);
-
-                        // theme
-                        pkg.Write((int)(spawn.m_dungeonRequireTheme));
-
-                        // biome
-                        pkg.Write((int)(spawn.m_requireBiome));
-
-                        // lava?
-                        pkg.Write(spawn.m_notInLava);
-
-                        // elevation min
-                        pkg.Write(spawn.m_minElevation);
-
-                        // elevation max
-                        pkg.Write(spawn.m_maxElevation);
-
-
-
-                        //pkg.Write(spawn.m_chanceToSpawn);
-
-                        pkg.Write(spawn.m_childNetViews.Count);
-                        foreach (var view in spawn.m_childNetViews)
+                        var dungeon = view.gameObject.GetComponent<DungeonGenerator>();
+                        if (dungeon && !dungeons.ContainsKey(hash))
                         {
-                            pkg.Write(view.GetPrefabName().GetStableHashCode());
-
-                            pkg.Write(view.transform.position);
-                            pkg.Write(view.transform.rotation);
-                        }
-                        //pkg.Write((int)spawn.m_dungeonRequireTheme);
-                        //pkg.Write((int)spawn.m_requireBiome);
+                            dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(zloc, dungeon);
+                        }    
                     }
 
-                    // ?
-                    //pkg.Write(69420);
+
+
+                    /*
+                     * 
+                     * Dump Location netviews
+                     * 
+                     **/
+
+                    pkg.Write(netViews.Length);
+                    foreach (var view in netViews)
+                    {
+                        var viewName = Utils.GetPrefabName(view.gameObject);
+
+                        pkg.Write(viewName); //Name included for Debugging
+                        pkg.Write(viewName.GetStableHashCode());
+                        pkg.Write(view.gameObject.transform.position);
+                        pkg.Write(view.gameObject.transform.rotation);
+                    }
+
+
+
+                    /*
+                     *
+                     *  RandomSpawn correspondence with Views
+                     *
+                     **/
+
+                    var randomSpawns = zloc.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
+                    WriteRandomSpawns(netViews, randomSpawns, ref pkg);
 
                     pkg.Write(zloc.m_slopeRotation);
                     pkg.Write(zloc.m_snapToWater);
                     pkg.Write(zloc.m_unique);
 
                     LogInfo("  NetViews...");
-
-                    // set all active like in laceLocations()
-                    var netViews = Utils.GetEnabledComponentsInChildren<ZNetView>(zloc.m_prefab.Asset);
-                    //var netViews = zloc.m_prefab.Asset.GetComponentsInChildren<ZNetView>();
-                    //foreach (var view in netViews)
-                    //{
-                    //    view.gameObject.SetActive(true);
-                    //}
-
-                    List<ZNetView> views = new List<ZNetView>();
-                    //ZNetView.StartGhostInit();
-                    foreach (var view in netViews) // .m_prefab.GetComponent<Location>()
-                    {
-                        if (view.gameObject.activeSelf)
-                        {
-                            ////ZNetView.StartGhostInit();
-
-                            // nothing needs to be instantiated
-
-                            //var obj = UnityEngine.Object.Instantiate<GameObject>(view.gameObject,
-                            //view.gameObject.transform.position, view.gameObject.transform.rotation);
-
-                            views.Add(view);
-
-                            int hash = view.GetPrefabName().GetStableHashCode();
-
-                            var dungeon = view.gameObject.GetComponent<DungeonGenerator>();
-                            if (dungeon && !dungeons.ContainsKey(hash))
-                            {
-                                // name should be normal and within prefabs
-                                dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(zloc, dungeon);
-                            }
-
-                            //ZNetView nv = obj.GetComponent<ZNetView>();
-                            //views.Add(nv);
-                            //
-                            //var dungeon = obj.GetComponent<DungeonGenerator>();
-                            //if (dungeon && !dungeons.ContainsKey(hash))
-                            //{
-                            //    dungeons[hash] = new KeyValuePair<ZoneSystem.ZoneLocation, DungeonGenerator>(zloc, dungeon);
-                            //    //dungeons.Add(obj.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
-                            //}
-
-                            ////ZNetView.FinishGhostInit();
-                        }
-                    }
-
-                    pkg.Write(views.Count);
-                    foreach (var view in views)
-                    {
-                        //pkg.Write(view.GetPrefabName().GetStableHashCode());
-                        pkg.Write(Utils.GetPrefabName(view.gameObject).GetStableHashCode());
-                        //pkg.Write(view.m_zdo.m_position);
-                        pkg.Write(view.gameObject.transform.position);
-                        //pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
-                        pkg.Write(view.gameObject.transform.rotation);
-
-                        ////pkg.Write(view.GetPrefabName().GetStableHashCode());
-                        ////pkg.Write(view.m_zdo.m_position);
-                        ////pkg.Write(Quaternion.Euler(view.m_zdo.m_rotation));
-                    }
-
-                    // free (not really needed)
-                    //foreach (var view in views)
-                    //UnityEngine.GameObject.Destroy(view.gameObject);
-
-                    
                 }
 
                 File.WriteAllBytes(ValhallaDumper.PKG_PATH + "features.pkg", pkg.GetArray());
@@ -518,7 +499,7 @@ namespace ValhallaDumper
 
             {
 
-                LogInfo("Dumping RandomEvents");
+                LogInfo("------------------- Dumping RandomEvents -------------------");
 
                 var events = new List<RandomEvent>();
                 foreach (var e in RandEventSystem.instance.m_events)
@@ -526,11 +507,11 @@ namespace ValhallaDumper
                     if (e.m_enabled && e.m_random)
                     {
                         events.Add(e);
-                        LogWarning(" - Including " + e.m_name);
+                        LogInfo("+evt " + e.m_name);
                     }
                     else
                     {
-                        LogWarning(" - (Excluding) " + e.m_name);
+                        LogWarning("-" + e.m_name + " (disabled)");
                     }
                 }
 
@@ -577,128 +558,48 @@ namespace ValhallaDumper
             ZoneSystem.instance.m_didZoneTest = true;
 
             {
-                LogInfo("Dumping " + dungeons.Count + " Dungeons");
-
+                LogInfo("------------------- Dumping Dungeons -------------------");
+                                
                 // Dump dungeons
                 ZPackage pkg = new ZPackage();
 
                 pkg.Write(comment);
-                pkg.Write(Version.CurrentVersion.ToString()); // write version for reference purposes
+                pkg.Write(Version.CurrentVersion.ToString()); // write version for validation purposes
                 pkg.Write(dungeons.Count);
+
+                int dungeonIdx = 0;
                 foreach (var pair in dungeons)
                 {
-                    //var loc = __instance.m_locationsByHash[hash];
-
                     var zoneLocation = pair.Value.Key;
 
                     var prefab = zoneLocation.m_prefab;
                     prefab.Load();
-                    ZNetView[] enabledComponentsInChildren = Utils.GetEnabledComponentsInChildren<ZNetView>(prefab.Asset);
-                    RandomSpawn[] enabledComponentsInChildren2 = Utils.GetEnabledComponentsInChildren<RandomSpawn>(prefab.Asset);
-
-                    for (int i = 0; i < enabledComponentsInChildren2.Length; i++)
-                    {
-                        enabledComponentsInChildren2[i].Prepare();
-                    }
-
-                    //LogInfo(" - " + zoneLocation.m_name + " (" + prefab.Asset.name + ") - Prefab: " + ZNetScene.instance.m_namedPrefabs.ContainsKey(prefab.Name.GetStableHashCode()) + " (" + prefab.Name + ")");
+                    //ZNetView[] enabledComponentsInChildren = Utils.GetEnabledComponentsInChildren<ZNetView>(prefab.Asset);
 
                     var loc = prefab.Asset.GetComponent<Location>()!;
 
-                    //var dungeon = prefab.Asset.GetComponent<DungeonGenerator>()!;
                     var dungeon = pair.Value.Value!; // we use the instanced generator, not the template one
-                    //var name = prefab.Asset.name ?? Utils.GetPrefabName(prefab.Asset);
-                    //var name = Utils.GetPrefabName(prefab.Asset)!;
-                    var name = dungeon.name;
+                    var dungeonName = dungeon.name;
 
-                    LogInfo(" - loc: " + prefab.Asset.name + ", pfb/dngn: " + ZNetScene.instance.m_namedPrefabs.ContainsKey(name.GetStableHashCode()) + " / " + name);
+                    if (!ZNetScene.instance.m_namedPrefabs.ContainsKey(dungeonName.GetStableHashCode()))
+                    {
+                        throw new Exception("instanced dungeon might be used instead of the template one");
+                    }
 
-                    //var dungeon = pair
-                    //.Value
-                    //.Value;
+                    LogInfo(": " + dungeonName + " (" + dungeonIdx + ")");
 
-                    //{
-                    //
-                    //
-                    //    Vector3 vector = Vector3.zero;
-                    //    Vector3 vector2 = Vector3.zero;
-                    //    if (loc.m_interiorTransform)
-                    //    {
-                    //        vector = loc.m_interiorTransform.localPosition;
-                    //        vector2 = loc.m_generator.transform.localPosition;
-                    //        pkg.Write(vector);
-                    //        pkg.Write()
-                    //    }
-                    //}
+                    // Debug anchor
+                    pkg.Write("dungeon".GetStableHashCode());
 
-                    //pkg.Write(dungeon.GetComponent<ZNetView>().GetPrefabName());
-                    pkg.Write(name);
-                    //pkg.Write(loc.m_interiorTransform
-                    //    ?.localPosition ?? Vector3.zero); // m_interiorPosition);
-                    //pkg.Write(loc.m_generator.transform
-                    //    .localPosition); // zoneLocation.m_generatorPosition);
+                    pkg.Write(dungeonName);
 
                     bool useTransform = loc.m_useCustomInteriorTransform && loc.m_interiorTransform && loc.m_generator;
                     pkg.Write(useTransform);
                     if (useTransform)
                     {                        
-                        //if (loc.m_interiorTransform && loc.m_generator)
-                        {
-                            //bool anyNull = zoneLocation.m_interiorPosition == null
-                            //|| zoneLocation.m_generatorPosition == null;
-
-                            //if (loc.m_useCustomInteriorTransform != anyNull)
-                            //LogError("hmm, m_useCustomInteriorTransform but positions are null");
-
-                            //pkg.Write(loc.m_useCustomInteriorTransform);
-
-
-
-                            ///LogWarning(dungeon.name + " " 
-                            ///    + zoneLocation.m_interiorPosition + " | " 
-                            ///    + zoneLocation.m_generatorPosition);
-                            ///
-                            ///RecurseObjectPrint(loc.m_interiorTransform.gameObject, 0);
-
-                            //var interior = loc.m_interiorTransform;
-
-                            //var tf = dungeon.transform;
-
-                            //LogWarning(dungeon.name + " " + tf.localPosition + " " + tf.localRotation);
-
-                            pkg.Write(loc.m_interiorTransform.localPosition);
-                            pkg.Write(loc.m_interiorTransform.localRotation);
-                            pkg.Write(loc.m_generator.transform.localPosition);
-                            //pkg.Write(zoneLocation.m_generatorPosition);
-
-                            //bool anyEmpty = zoneLocation.m_interiorPosition == null || zoneLocation.m_generatorPosition == null
-                            //    || zoneLocation.m_interiorPosition == Vector3.zero || zoneLocation.m_generatorPosition == Vector3.zero;
-                            //
-                            //if (loc.m_useCustomInteriorTransform == anyEmpty)
-                            //    LogError("Dungeon m_useCustomInteriorTransform mismatch with transform value");
-
-                            //try
-                            //{
-                            //    LogWarning("interior transform: ");
-                            //    LogWarning(" - name: " + loc.m_interiorTransform.name); // Dungeon name
-                            //    LogWarning(" - parent.name: " + loc.m_interiorTransform.parent.name); // Location name
-                            //
-                            //    LogWarning(" - children: ");
-                            //    int childCount1 = loc.m_interiorTransform.childCount;
-                            //    for (int i = 0; i < childCount1; i++)
-                            //    {
-                            //        var child = loc.m_interiorTransform.GetChild(i);
-                            //        var childCount2 = child.childCount;
-                            //        LogWarning("   - " + child.name + ":");
-                            //        for (int j = 0; j < childCount2; j++)
-                            //        {
-                            //            var child2 = child.GetChild(j);
-                            //            LogWarning("     - " + child2.name);
-                            //        }
-                            //    }
-                            //}
-                            //catch (Exception e) { }
-                        }
+                        pkg.Write(loc.m_interiorTransform.localPosition);
+                        pkg.Write(loc.m_interiorTransform.localRotation);
+                        pkg.Write(loc.m_generator.transform.localPosition);
                     }
 
                     pkg.Write((int)dungeon.m_algorithm);
@@ -708,12 +609,27 @@ namespace ValhallaDumper
                     pkg.Write(dungeon.m_doorChance);
 
                     pkg.Write(dungeon.m_doorTypes.Count);
-                    foreach (var door in dungeon.m_doorTypes)
+
+                    int doorIdx = 0;
+                    foreach (var doorDef in dungeon.m_doorTypes)
                     {
-                        var doorPrefab = door.m_prefab;
-                        pkg.Write(doorPrefab.GetComponent<ZNetView>().GetPrefabName().GetStableHashCode());
-                        pkg.Write(door.m_connectionType);
-                        pkg.Write(door.m_chance);
+                        var doorPrefab = doorDef.m_prefab;
+                        var doorPrefabName = doorPrefab.GetComponent<ZNetView>().GetPrefabName();
+
+                        LogInfo("door: " + doorPrefabName + " (" + doorIdx++ + " / " + doorPrefab.name + ")");
+                        if (!ZNetScene.instance.m_namedPrefabs.ContainsKey(doorPrefabName.GetStableHashCode()))
+                        {
+                            // THROW panic out, becuase this package is now useless
+                            throw new Exception("Door Prefab: " + doorPrefabName + " not found");
+                        }
+
+                        // Debug anchor (positional anchor)
+                        pkg.Write("dungeonDoor".GetStableHashCode());
+
+                        pkg.Write(doorPrefabName); // auxillary for debug
+                        pkg.Write(doorPrefabName.GetStableHashCode());
+                        pkg.Write(doorDef.m_connectionType);
+                        pkg.Write(doorDef.m_chance);
                     }
 
                     //LogWarning("dungeon.m_gridSize: " + dungeon.m_gridSize);
@@ -729,9 +645,9 @@ namespace ValhallaDumper
                     pkg.Write(dungeon.m_perimeterSections);
 
                     pkg.Write(dungeon.m_requiredRooms.Count);
-                    foreach (var room in dungeon.m_requiredRooms)
+                    foreach (var roomName in dungeon.m_requiredRooms)
                     {
-                        pkg.Write(room);
+                        pkg.Write(roomName);
                     }
 
                     pkg.Write(dungeon.m_spawnChance);
@@ -748,45 +664,9 @@ namespace ValhallaDumper
                         roomData.m_prefab.Load();
 
                         var room = roomData.RoomInPrefab;
-                        var netviews = roomData.m_prefab.Asset.GetComponentsInChildren<ZNetView>();
-                        // TODO, do we grab OEM ranSpawns, or use the copied/Instantiated ones?
-                        //var randomSpawns = roomData.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
 
-                        /*
-                        {
-                            foreach (var view in netviews)
-                            {
-                                view.gameObject.SetActive(false);
-                            }
-
-                            //var components = roomData.m_room.transform.GetComponents<MonoBehaviour>();
-                            var components = roomData.m_room.transform.GetComponents(typeof(MonoBehaviour));
-
-                            LogWarning(room.name);
-                            LogWarning(" - Components: ");
-                            foreach (var component in components)
-                            {
-                                LogWarning("   - " + component.GetType().Name);
-                            }
-
-                            var childComponents = roomData.m_room.transform
-                                .GetComponentsInChildren(typeof(MonoBehaviour), false);
-
-                            LogWarning(" - ChildComponents: ");
-                            foreach (var component in childComponents)
-                            {
-                                LogWarning("   - " + component.GetType().Name);
-                            }
-
-                            LogWarning(" - Children: ");
-                            var childCount = roomData.m_room.transform.childCount;
-                            for (int ic = 0; ic < childCount; ic++)
-                            {
-                                var child = roomData.m_room.transform.GetChild(ic);
-
-                                LogWarning("   - " + child.name);
-                            }
-                        }*/
+                        // BASIC "CHECKSUM" (because im a dumbass) (positional anchor)
+                        pkg.Write("dungeonRoom".GetStableHashCode());
 
                         pkg.Write(Utils.GetPrefabName(room.gameObject));
                         pkg.Write(room.m_divider);
@@ -812,197 +692,35 @@ namespace ValhallaDumper
                             pkg.Write(conn.transform.localRotation);
                         }
 
-                        foreach (var view in netviews)
-                        {
-                            view.gameObject.SetActive(true);
-                        }
-
-                        // i have a suspicion that m_randomSpawns is directly tied to m_netViews
-                        // ie. RandomSpawn enables/disables specific spawned m_netView instances in Room
-
-                        List<ZNetView> views = new List<ZNetView>();
-                        ZNetView.StartGhostInit();
-                        foreach (var view in netviews) // .m_prefab.GetComponent<Location>()
-                        {
-                            if (view.gameObject.activeSelf)
-                            {
-                                views.Add(view);
-                            }
-                        }
-
                         Quaternion quat = Quaternion.Inverse(room.transform.rotation);
 
-                        /*
-                         * TODO
-                         *  *very important
-                         *  
-                         *  RandomSpawns must be dumped IN-ORDER SPECIFIC,
-                         *      because of deterministic UnityRandom
-                         */
+                        var netViews = Utils.GetEnabledComponentsInChildren<ZNetView>(roomData.m_prefab.Asset);
 
-                        // ensure every RandomSpawn has no children
+                        pkg.Write(netViews.Length);
+                        foreach (var view in netViews)
                         {
-                            var randomSpawns = roomData.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
+                            // BASIC "CHECKSUM" (positional anchor)
+                            pkg.Write("dungeonView".GetStableHashCode());
 
-                            foreach (var randomSpawn in randomSpawns)
-                            {
-                                //var sub = randomSpawn.GetComponentsInChildren<ZNetView>
+                            var prefabName = view.GetPrefabName();
 
-                                if (randomSpawn.transform.childCount != 0)
-                                {
-                                    // This WILL print (I hate unity
-                                    //LogWarning("Unexpected children (but expected apparently): " + randomSpawn.transform.parent.gameObject.name);
-                                }
-                            }
-
-                            //var childCount = roomData.m_prefab.Asset.transform.childCount;
+                            pkg.Write(prefabName); // auxillary for debug
+                            pkg.Write(prefabName.GetStableHashCode());
+                            pkg.Write(quat * (view.gameObject.transform.position - room.transform.position)); // local pos
+                            pkg.Write(quat * view.gameObject.transform.rotation); // local rot
                         }
 
-                        pkg.Write(views.Count);
-                        foreach (var view in views)
-                        {
-                            pkg.Write(view.GetPrefabName().GetStableHashCode());
-                            //pkg.Write(view.m_zdo.m_position);
-                            //pkg.Write(view.m_zdo.m_rotation);
-
-                            // This writes the local transforms (as it should be)
-                            //pkg.Write(quat * (view.m_zdo.m_position - room.transform.position));
-                            //pkg.Write(quat * view.m_zdo.m_rotation);
-
-                            pkg.Write(quat * (view.gameObject.transform.position - room.transform.position));
-                            pkg.Write(quat * view.gameObject.transform.rotation);
-
-                            // Write RandomSpawns for attached prefab here
-
-                            // Or attach by index (then use later)
-
-                            var spawn = view.GetComponent<RandomSpawn>();
-                            pkg.Write(spawn != null);
-                            if (spawn != null)
-                            {
-                                spawn.Prepare();
-
-
-
-                                // chance
-                                pkg.Write(spawn.m_chanceToSpawn);
-
-                                // theme
-                                pkg.Write((int)(spawn.m_dungeonRequireTheme));
-
-                                // biome
-                                pkg.Write((int)(spawn.m_requireBiome));
-
-                                // lava?
-                                pkg.Write(spawn.m_notInLava);
-
-                                // elevation min
-                                pkg.Write(spawn.m_minElevation);
-
-                                // elevation max
-                                pkg.Write(spawn.m_maxElevation);
-
-
-
-                                //pkg.Write(spawn.m_chanceToSpawn);
-
-                                pkg.Write(spawn.m_childNetViews.Count);
-                                foreach (var cview in spawn.m_childNetViews)
-                                {
-                                    pkg.Write(cview.GetPrefabName().GetStableHashCode());
-
-                                    pkg.Write(cview.transform.position);
-                                    pkg.Write(cview.transform.rotation);
-                                }
-                                //pkg.Write((int)spawn.m_dungeonRequireTheme);
-                                //pkg.Write((int)spawn.m_requireBiome);
-                            }
-                        }
-
-
-
-                        // dump randomSpawns
-
-                        //  All RandomSpawns have an attached NetView
-                        //  Only (*SOME) NetViews have an attached RandomSpawn
-
-                        //  If object *STILL* enabled after attached randomspawn actions,
-                        //  then instantiate object (as prefab copy)
-                        //  (only applies during gen)
-
-                        // we still have to dump all relevant info
-
-                        //var randomSpawns = roomData.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
-
-                        // try something to avoid many rspawns
-                        // just gather all to check for nested ranSpawns
-
-                        // CHECK that all randomSpawns have no nested ...
-                        //var randomSpawns = views.GetComponentsInChildren<RandomSpawn>();
-
-                        // Check all random spawns beforehand, for any sub-tied objects
-                        //  because we expect only ZNetViews to be the only object
-                        /*
-                        {
-                            roomData.m_prefab.Asset.GetComponentsInChildren<RandomSpawn>();
-
-                            var childCount = roomData.m_prefab.Asset.transform.childCount;
-                        }
-
-                        foreach (var view in views)
-                        {
-                            var randomSpawn = view.GetComponentsInChildren<RandomSpawn>();
-                            if (randomSpawn != null)
-                            {
-                                // check that no sub objects exist
-                            }
-                        }
-
-
-                        pkg.Write(randomSpawns.Length);
-                        foreach (var rand in randomSpawns)
-                        {
-                            // write tied <view Object> index (or -1 if none...?)
-                            //  Get attached NetView
-
-                            pkg.Write(rand.gameObject)
-
-                            // write offObject index / is this a view...?
-
-                            // chance
-                            pkg.Write(rand.m_chanceToSpawn);
-
-                            // theme
-                            pkg.Write(nameof(rand.m_dungeonRequireTheme));
-
-                            // biome
-                            pkg.Write(nameof(rand.m_requireBiome));
-
-                            // lava?
-                            pkg.Write(rand.m_notInLava);
-
-                            // elevation min
-                            pkg.Write(rand.m_minElevation);
-
-                            // elevation max
-                            pkg.Write(rand.m_maxElevation);
-                        }*/
-
+                        // Dump RandomSpawns
+                        var randomSpawns = global::Utils.GetEnabledComponentsInChildren<RandomSpawn>(roomData.m_prefab.Asset);
+                        WriteRandomSpawns(netViews, randomSpawns, ref pkg);
 
                         pkg.Write(room.m_size);
                         pkg.Write((int)room.m_theme);
                         pkg.Write(room.m_weight);
                         pkg.Write(room.transform.position);
                         pkg.Write(room.transform.rotation);
-
-
                     }
 
-                    // everything is disgustingly manual in this game... ugh...
-                    foreach (var c in enabledComponentsInChildren2)
-                    {
-                        c.Reset();
-                    }
                 }
 
                 File.WriteAllBytes(ValhallaDumper.PKG_PATH + "dungeons.pkg", pkg.GetArray());
@@ -1013,9 +731,7 @@ namespace ValhallaDumper
 
 
             {
-                LogInfo("Dumping Vegetation");
-
-
+                LogInfo("------------------- Dumping Vegetation -------------------");
 
                 ZPackage pkg = new ZPackage();
 
@@ -1027,19 +743,15 @@ namespace ValhallaDumper
                         if (veg.m_prefab && veg.m_prefab.GetComponent<ZNetView>())
                         {
                             vegetation.Add(veg);
-                            LogInfo("Queing: " + veg.m_prefab.name);
+                            LogInfo("+veg " + veg.m_prefab.name);
                         }
                         else {
-                            LogError("Fail queuing: " + veg.m_prefab.name);
+                            LogError("-veg " + veg.m_prefab.name + " (no prefab or nv)");
                         }
                     }
                     else
                     {
-                        LogWarning("Skipping queing: " + veg.m_prefab.name);
-
-                        // Most conflict anyways because lazy
-                        //if (veg.m_name != veg.m_prefab.name)
-                        //LogWarning("ZoneVegetation unequal names: " + veg.m_name + ", " + veg.m_prefab.name);
+                        LogWarning("-veg " + veg.m_prefab.name + " (disabled)");
                     }
                 }
 
@@ -1050,12 +762,14 @@ namespace ValhallaDumper
                 int STATIC_MASK = ZoneSystem.m_instance.m_staticSolidRayMask;
                 int TERRAIN_MASK = ZoneSystem.m_instance.m_terrainRayMask;
 
-                LogWarning("Layers: \n - " + string.Join("\n - ", layers));
+                //LogWarning("Layers: \n - " + string.Join("\n - ", layers));
+                //
+                //LogWarning("blockRayMask: " + Convert.ToString(BLOCK_MASK, 2));
+                //LogWarning("solidRayMask: " + Convert.ToString(SOLID_MASK, 2));
+                //LogWarning("staticSolidRayMask: " + Convert.ToString(STATIC_MASK, 2));
+                //LogWarning("terrainRayMask: " + Convert.ToString(TERRAIN_MASK, 2));
 
-                LogWarning("blockRayMask: " + Convert.ToString(BLOCK_MASK, 2));
-                LogWarning("solidRayMask: " + Convert.ToString(SOLID_MASK, 2));
-                LogWarning("staticSolidRayMask: " + Convert.ToString(STATIC_MASK, 2));
-                LogWarning("terrainRayMask: " + Convert.ToString(TERRAIN_MASK, 2));
+
 
                 // nano-sized tidbits (pickable mushrooms, seeds...)
                 // 0.28
@@ -1104,16 +818,18 @@ namespace ValhallaDumper
                     }
                 );
 
-                Dictionary<string, float> customRadius = new Dictionary<string, float>();
-                customRadius.Add("cliff_mistlands1", 11);
-                customRadius.Add("cliff_mistlands1_creep", 11);
-                customRadius.Add("cliff_mistlands2", 11);
-                customRadius.Add("rock4_forest", 12);
-                customRadius.Add("rock4_copper", 12);
-                customRadius.Add("YggdrasilRoot", 9);
-                customRadius.Add("giant_helmet1", 7);
-                customRadius.Add("giant_helmet2", 5); // only front of helmet1
-                customRadius.Add("rock4_coast", 7);
+                Dictionary<string, float> customRadius = new Dictionary<string, float>
+                {
+                    { "cliff_mistlands1", 11 },
+                    { "cliff_mistlands1_creep", 11 },
+                    { "cliff_mistlands2", 11 },
+                    { "rock4_forest", 12 },
+                    { "rock4_copper", 12 },
+                    { "YggdrasilRoot", 9 },
+                    { "giant_helmet1", 7 },
+                    { "giant_helmet2", 5 }, // only front of helmet1
+                    { "rock4_coast", 7 }
+                };
 
                 // these are not heavily tested or measured
                 /*
@@ -1155,16 +871,17 @@ namespace ValhallaDumper
                     //if (veg.m_prefab.transform.localScale != new Vector3(1, 1, 1))
                     //LogWarning("Vegetation prefab localScale is not (1, 1, 1): " + veg.m_name + " " + veg.m_prefab.transform.localScale);
 
-                    pkg.Write(veg.m_prefab.GetComponent<ZNetView>().GetPrefabName());
-                    //pkg.Write(veg.m_prefab.name);
-                    //pkg.Write(veg.m_name);
+                    var prefabName = veg.m_prefab.GetComponent<ZNetView>().GetPrefabName();
+
+                    pkg.Write(prefabName);
                     pkg.Write((int)veg.m_biome);
                     pkg.Write((int)veg.m_biomeArea);
 
-                    GameObject obj = UnityEngine.GameObject.Instantiate<GameObject>(veg.m_prefab);
+                    // TODO do I have to instantiate?
+                    GameObject obj = UnityEngine.Object.Instantiate(veg.m_prefab);
 
-                    var collider = obj.GetComponent<Collider>();
-                    if (!collider) collider = obj.GetComponentInChildren<Collider>();
+                    var collider = obj.GetComponent<Collider>() ?? obj.GetComponentInChildren<Collider>();
+
                     if (collider)
                     {
                         // test whether layer has
@@ -1181,20 +898,25 @@ namespace ValhallaDumper
                             radius = 0;
 
                         float temp = 0;
-                        if (customRadius.TryGetValue(veg.m_prefab.name, out temp))
+                        if (customRadius.TryGetValue(prefabName, out temp))
                             radius = temp;
-                        else if (nanoRadius.Contains(veg.m_prefab.name))
+                        else if (nanoRadius.Contains(prefabName))
                             radius = 0.28f;
-                        else if (tinyRadius.Contains(veg.m_prefab.name))
+                        else if (tinyRadius.Contains(prefabName))
                             radius = 0.70f;
-                        else if (smallRadius.Contains(veg.m_prefab.name))
+                        else if (smallRadius.Contains(prefabName))
                             radius = 0.95f;
-                        else if (mildRadius.Contains(veg.m_prefab.name))
+                        else if (mildRadius.Contains(prefabName))
                             radius = 1.10f;
-                        else if (bigRadius.Contains(veg.m_prefab.name))
+                        else if (bigRadius.Contains(prefabName))
                             radius = 2.20f;
+                        else
+                        {
+                            LogWarning("Vegetation missing defined radius: " + prefabName + " (is this a new version?)");
+                        }
 
-                        LogWarning("Dumping vegetation block layer " + veg.m_prefab.name + ", radius: " + radius);
+                        LogWarning("Dumping vegetation block layer " + prefabName + ", radius: " + radius);
+
                         pkg.Write(radius);
 
                         /*
@@ -1227,7 +949,7 @@ namespace ValhallaDumper
                         pkg.Write(0.0f);
                     }
 
-                    UnityEngine.GameObject.Destroy(obj);
+                    UnityEngine.Object.Destroy(obj);
 
                     /*else
                     {
@@ -1270,8 +992,9 @@ namespace ValhallaDumper
                                 //}
 
                             }
-                        }                            
+                        }
                     }*/
+
                     pkg.Write(veg.m_min);
                     pkg.Write(veg.m_max);
                     pkg.Write(veg.m_minTilt);
